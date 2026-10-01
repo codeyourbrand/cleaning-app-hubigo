@@ -131,7 +131,7 @@ export default function ImportPage() {
           </div>
 
           <div className="space-y-5">
-            <div className="space-y-1.5 sm:max-w-xs">
+            <div className="sm:max-w-xs">
               <Label htmlFor="date">Date</Label>
               <Input
                 id="date"
@@ -140,12 +140,12 @@ export default function ImportPage() {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 All imported tasks will be scheduled for this date.
               </p>
             </div>
 
-            <div className="space-y-1.5">
+            <div>
               <Label htmlFor="csv">Paste CSV / spreadsheet</Label>
               <Textarea
                 id="csv"
@@ -157,7 +157,7 @@ export default function ImportPage() {
                   "Apartment number, Check out time, Check in window, Guests, Nights, Requests, Instructions\n157, 11:00, 15:00-16:00, 4, 3, Luggage, Prepare sofa"
                 }
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="mt-1.5 text-xs text-muted-foreground">
                 First row must be the header. Columns are matched automatically
                 by name.
               </p>

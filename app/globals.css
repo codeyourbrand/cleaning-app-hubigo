@@ -133,6 +133,10 @@
   html {
     @apply font-sans;
   }
+  /* Consistent gap between a form label and the field that follows it */
+  [data-slot="label"] + * {
+    margin-top: 0.5rem;
+  }
 }
 
 @layer utilities {
