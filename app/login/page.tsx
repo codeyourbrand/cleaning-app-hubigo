@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { HubigoMark } from "@/components/logo";
 import { toast } from "sonner";
 
 export default function LoginPage() {
@@ -36,7 +37,9 @@ export default function LoginPage() {
         toast.error(data.error || "Could not sign in");
       } else {
         toast.success("Signed in");
-        router.push(data.user.role === "COORDINATOR" ? "/coordinator" : "/cleaner/tasks");
+        router.push(
+          data.user.role === "COORDINATOR" ? "/coordinator" : "/cleaner/tasks",
+        );
       }
     } finally {
       setLoading(false);
@@ -47,11 +50,11 @@ export default function LoginPage() {
     <main className="min-h-screen flex flex-col items-center justify-center p-6 bg-background">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary text-primary-foreground text-3xl font-bold mb-4">
-            H
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight">Hubigo</h1>
-          <p className="text-muted-foreground mt-1">Cleaning & maintenance operations</p>
+          <HubigoMark className="size-16 rounded-2xl mb-4 mx-auto" />
+          <h1 className="text-3xl font-bold tracking-tight">hubigo</h1>
+          <p className="text-muted-foreground mt-1">
+            Cleaning & maintenance operations
+          </p>
         </div>
 
         <Tabs value={tab} onValueChange={(v) => setTab(v as "email" | "phone")}>
@@ -114,7 +117,11 @@ export default function LoginPage() {
               </Label>
             </div>
 
-            <Button type="submit" className="w-full h-12 text-lg" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-12 text-lg"
+              disabled={loading}
+            >
               {loading ? "Signing in..." : "Sign in"}
             </Button>
           </form>

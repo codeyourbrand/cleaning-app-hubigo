@@ -16,19 +16,28 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { HubigoLogo } from "@/components/logo";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/coordinator", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/coordinator/tasks/new", label: "Tasks", icon: ListTodo },
+  { href: "/coordinator/tasks/new", label: "Create task", icon: ListTodo },
   { href: "/coordinator/apartments", label: "Apartments", icon: Building2 },
   { href: "/coordinator/users", label: "Users", icon: Users },
   { href: "/coordinator/import", label: "Import", icon: Upload },
   { href: "/coordinator/history", label: "History", icon: History },
-  { href: "/coordinator/settings/integrations", label: "Hostfully", icon: Plug },
+  {
+    href: "/coordinator/settings/integrations",
+    label: "Hostfully",
+    icon: Plug,
+  },
 ];
 
-export default function CoordinatorLayout({ children }: { children: React.ReactNode }) {
+export default function CoordinatorLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
 
   async function logout() {
@@ -37,17 +46,22 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
   }
 
   const Nav = (
-    <nav className="flex flex-col gap-1">
+    <nav className="flex flex-1 flex-col gap-1">
       {links.map((link) => {
         const Icon = link.icon;
-        const active = pathname === link.href || pathname.startsWith(`${link.href}/`);
+        const active =
+          link.href === "/coordinator"
+            ? pathname === "/coordinator"
+            : pathname === link.href || pathname.startsWith(`${link.href}/`);
         return (
           <Link
             key={link.href}
             href={link.href}
             className={cn(
-              "flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition-colors",
-              active ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              active
+                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
             )}
           >
             <Icon className="size-5" />
@@ -57,7 +71,7 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
       })}
       <button
         onClick={logout}
-        className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted transition-colors mt-auto"
+        className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
       >
         <LogOut className="size-5" />
         Logout
@@ -67,32 +81,41 @@ export default function CoordinatorLayout({ children }: { children: React.ReactN
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="hidden md:flex w-64 flex-col border-r bg-card p-4">
-        <div className="mb-6 flex items-center gap-2 px-2">
-          <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">H</div>
-          <span className="text-xl font-bold">Hubigo</span>
+      <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground p-4">
+        <div className="mb-8 px-2 pt-2">
+          <HubigoLogo />
         </div>
         {Nav}
       </aside>
 
-      <header className="md:hidden flex items-center justify-between border-b p-4 bg-card">
-        <div className="flex items-center gap-2">
-          <div className="size-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold">H</div>
-          <span className="text-xl font-bold">Hubigo</span>
-        </div>
+      <header className="md:hidden sticky top-0 z-40 flex items-center justify-between bg-sidebar text-sidebar-foreground px-4 py-3">
+        <HubigoLogo markClassName="size-8" />
         <Sheet>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Open menu">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Open menu"
+              className="text-sidebar-foreground hover:bg-sidebar-accent"
+            >
               <Menu className="size-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-64 p-4">
+          <SheetContent
+            side="right"
+            className="w-64 flex flex-col bg-sidebar text-sidebar-foreground border-sidebar-border p-4"
+          >
+            <div className="mb-6 px-2">
+              <HubigoLogo />
+            </div>
             {Nav}
           </SheetContent>
         </Sheet>
       </header>
 
-      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">{children}</main>
+      <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        {children}
+      </main>
     </div>
   );
 }
