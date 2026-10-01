@@ -1,0 +1,278 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CLEANER
+  COORDINATOR
+}
+
+enum TaskType {
+  CLEANING
+  REPAIR
+  OTHER
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
+enum MediaType {
+  BEFORE
+  AFTER
+  COMMENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  role         Role
+  phone        String?  @unique
+  email        String?  @unique
+  passwordHash String
+  avatarUrl    String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedTasks   Task[]        @relation("AssignedTasks")
+  createdTasks    Task[]        @relation("CreatedTasks")
+  startedTasks    Task[]        @relation("StartedTasks")
+  doneTasks       Task[]        @relation("DoneTasks")
+  comments        Comment[]
+  media           Media[]
+  lostFoundItems  LostFound[]
+  damages         Damage[]
+  auditLogs       AuditLog[]
+  taskStepsDone   TaskStep[]    @relation("TaskStepDoneBy")
+  notifications   Notification[]
+  pushSubscriptions WebPushSubscription[]
+
+  @@map("users")
+}
+
+model Apartment {
+  id                String   @id @default(cuid())
+  number            String
+  building          String?
+  floor             String?
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  externalHostfullyId String? @unique @map("external_hostfully_id")
+  externalPropertyId String? @map("external_property_id")
+
+  tasks       Task[]
+  lostFounds  LostFound[]
+  damages     Damage[]
+  hostfullyReservations HostfullyReservation[]
+
+  @@unique([number, building], name: "apartment_number_building_unique")
+  @@index([number])
+  @@map("apartments")
+}
+
+model Task {
+  id                            String     @id @default(cuid())
+  date                          DateTime   @db.Date
+  apartmentId                   String     @map("apartment_id")
+  type                          TaskType
+  status                        TaskStatus @default(TODO)
+  checkoutTime                  String?    @map("checkout_time")
+  checkinWindow                 String?    @map("checkin_window")
+  guestsCount                   Int?       @map("guests_count")
+  nightsCount                   Int?       @map("nights_count")
+  requests                      String?
+  instructions                  String?
+  assignedToUserId              String?    @map("assigned_to_user_id")
+  createdByUserId               String     @map("created_by_user_id")
+  doneAt                        DateTime?  @map("done_at")
+  doneByUserId                  String?    @map("done_by_user_id")
+  startedAt                     DateTime?  @map("started_at")
+  startedByUserId               String?    @map("started_by_user_id")
+  createdAt                     DateTime   @default(now())
+  updatedAt                     DateTime   @updatedAt
+  externalHostfullyReservationId String?   @unique @map("external_hostfully_reservation_id")
+
+  apartment    Apartment    @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  createdBy    User         @relation("CreatedTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  startedBy    User?        @relation("StartedTasks", fields: [startedByUserId], references: [id], onDelete: SetNull)
+  doneBy       User?        @relation("DoneTasks", fields: [doneByUserId], references: [id], onDelete: SetNull)
+  steps        TaskStep[]
+  comments     Comment[]
+  media        Media[]
+  auditLogs    AuditLog[]
+  notifications Notification[]
+
+  @@index([date])
+  @@index([status])
+  @@index([assignedToUserId])
+  @@index([apartmentId])
+  @@index([date, status])
+  @@map("tasks")
+}
+
+model TaskStep {
+  id         String    @id @default(cuid())
+  taskId     String    @map("task_id")
+  name       String
+  done       Boolean   @default(false)
+  doneAt     DateTime? @map("done_at")
+  doneByUserId String? @map("done_by_user_id")
+  order      Int       @default(0)
+
+  task   Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  doneBy User? @relation("TaskStepDoneBy", fields: [doneByUserId], references: [id], onDelete: SetNull)
+
+  @@map("task_steps")
+}
+
+model Comment {
+  id           String    @id @default(cuid())
+  taskId       String    @map("task_id")
+  parentId     String?   @map("parent_id")
+  authorUserId String    @map("author_user_id")
+  body         String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  task    Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author  User      @relation(fields: [authorUserId], references: [id], onDelete: Cascade)
+  parent  Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies Comment[] @relation("CommentReplies")
+  media   Media[]
+
+  @@index([taskId, createdAt])
+  @@map("comments")
+}
+
+model Media {
+  id          String    @id @default(cuid())
+  taskId      String?   @map("task_id")
+  commentId   String?   @map("comment_id")
+  type        MediaType
+  url         String
+  addedByUserId String  @map("added_by_user_id")
+  createdAt   DateTime  @default(now())
+
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  addedBy User     @relation(fields: [addedByUserId], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+model AuditLog {
+  id        String    @id @default(cuid())
+  taskId    String?   @map("task_id")
+  userId    String    @map("user_id")
+  action    String
+  oldValue  String?   @map("old_value")
+  newValue  String?   @map("new_value")
+  createdAt DateTime  @default(now())
+
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("audit_logs")
+}
+
+model LostFound {
+  id              String    @id @default(cuid())
+  apartmentId     String    @map("apartment_id")
+  reportedByUserId String   @map("reported_by_user_id")
+  description     String
+  photoUrl        String?   @map("photo_url")
+  createdAt       DateTime  @default(now())
+
+  apartment    Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  reportedBy   User      @relation(fields: [reportedByUserId], references: [id], onDelete: Cascade)
+
+  @@map("lost_found")
+}
+
+model Damage {
+  id              String    @id @default(cuid())
+  apartmentId     String    @map("apartment_id")
+  reportedByUserId String  @map("reported_by_user_id")
+  description     String
+  photoUrl        String?   @map("photo_url")
+  createdAt       DateTime  @default(now())
+
+  apartment    Apartment @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  reportedBy   User      @relation(fields: [reportedByUserId], references: [id], onDelete: Cascade)
+
+  @@map("damages")
+}
+
+model HostfullyReservation {
+  id          String    @id @default(cuid())
+  externalId  String    @unique @map("external_id")
+  apartmentId String?   @map("apartment_id")
+  rawPayload  Json      @map("raw_payload")
+  status      String
+  checkIn     DateTime? @map("check_in")
+  checkOut    DateTime? @map("check_out")
+  guestsCount Int?      @map("guests_count")
+  nightsCount Int?      @map("nights_count")
+  lastSyncedAt DateTime @default(now()) @map("last_synced_at")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  apartment Apartment? @relation(fields: [apartmentId], references: [id], onDelete: SetNull)
+
+  @@map("hostfully_reservations")
+}
+
+model SyncEvent {
+  id              String    @id @default(cuid())
+  provider        String
+  externalEventId String?   @unique @map("external_event_id")
+  eventType       String    @map("event_type")
+  payload         Json
+  status          String
+  error           String?
+  createdAt       DateTime  @default(now())
+  processedAt     DateTime? @map("processed_at")
+
+  @@index([externalEventId])
+  @@map("sync_events")
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  taskId    String?   @map("task_id")
+  type      String
+  title     String
+  body      String
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model WebPushSubscription {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("web_push_subscriptions")
+}

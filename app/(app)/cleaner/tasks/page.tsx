@@ -1,0 +1,196 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { format, subDays, addDays } from "date-fns";
+import { Search, Luggage, Car, Baby, Wrench } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+
+type TaskWithApartment = {
+  id: string;
+  date: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE";
+  type: "CLEANING" | "REPAIR" | "OTHER";
+  checkoutTime: string | null;
+  checkinWindow: string | null;
+  guestsCount: number | null;
+  nightsCount: number | null;
+  requests: string | null;
+  instructions: string | null;
+  apartment: { id: string; number: string; building: string | null };
+  assignedTo: { id: string; name: string } | null;
+};
+
+export default function CleanerTasksPage() {
+  const [date, setDate] = useState<Date>(new Date());
+  const [tasks, setTasks] = useState<TaskWithApartment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"my" | "all" | "status">("my");
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const online = useOnlineStatus();
+
+  useEffect(() => {
+    fetchTasks();
+  }, [date, filter, statusFilter]);
+
+  async function fetchTasks() {
+    setLoading(true);
+    const params = new URLSearchParams();
+    params.set("date", format(date, "yyyy-MM-dd"));
+    if (filter === "my") params.set("myTasks", "true");
+    if (filter === "status" && statusFilter) params.set("status", statusFilter);
+
+    try {
+      const res = await fetch(`/api/tasks?${params.toString()}`);
+      const data = await res.json();
+      setTasks(data.tasks || []);
+    } catch {
+      // offline fallback could read from cache here
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const filteredTasks = tasks.filter((t) =>
+    t.apartment.number.toLowerCase().includes(search.toLowerCase()) ||
+    (t.apartment.building || "").toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Tasks</h1>
+        {!online && <Badge variant="secondary">OFFLINE</Badge>}
+      </div>
+
+      <div className="flex gap-2">
+        {[subDays(date, 1), date, addDays(date, 1)].map((d, i) => {
+          const label = i === 0 ? "Yesterday" : i === 1 ? "Today" : "Tomorrow";
+          const active = d.getTime() === date.getTime();
+          return (
+            <Button
+              key={label}
+              variant={active ? "default" : "outline"}
+              size="sm"
+              className="flex-1"
+              onClick={() => setDate(d)}
+              aria-pressed={active}
+            >
+              {label}
+            </Button>
+          );
+        })}
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search apartment"
+          className="pl-9"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant={filter === "my" ? "default" : "outline"} size="sm" onClick={() => setFilter("my")}>
+          My tasks
+        </Button>
+        <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")}>
+          All
+        </Button>
+        <Button variant={filter === "status" ? "default" : "outline"} size="sm" onClick={() => setFilter("status")}>
+          Status
+        </Button>
+        {filter === "status" && (
+          <select
+            className="text-sm border rounded-md px-2 py-1 bg-background"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Filter by status"
+          >
+            <option value="">All statuses</option>
+            <option value="TODO">To do</option>
+            <option value="IN_PROGRESS">In progress</option>
+            <option value="DONE">Done</option>
+          </select>
+        )}
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+      ) : filteredTasks.length === 0 ? (
+        <div className="text-center py-12 text-muted-foreground">
+          No tasks for this day.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {filteredTasks.map((task) => (
+            <TaskCard key={task.id} task={task} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TaskCard({ task }: { task: TaskWithApartment }) {
+  const statusColor =
+    task.status === "DONE" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
+    task.status === "IN_PROGRESS" ? "bg-amber-100 text-amber-700 border-amber-200" :
+    "bg-red-100 text-red-700 border-red-200";
+
+  return (
+    <Link href={`/tasks/${task.id}`}>
+      <div className="rounded-2xl border bg-card p-4 shadow-sm hover:shadow-md transition-shadow">
+        <div className="flex items-start justify-between mb-2">
+          <h2 className="text-3xl font-bold">{task.apartment.number}</h2>
+          <Badge className={statusColor} variant="outline">
+            {task.status.replace("_", " ")}
+          </Badge>
+        </div>
+
+        <div className="space-y-1 text-sm text-muted-foreground mb-3">
+          {task.checkoutTime && <p>Checkout {task.checkoutTime}</p>}
+          {task.checkinWindow && <p>Check-in {task.checkinWindow}</p>}
+          {(task.guestsCount || task.nightsCount) && (
+            <p>
+              {task.guestsCount ? `${task.guestsCount} guests` : ""}
+              {task.guestsCount && task.nightsCount ? " · " : ""}
+              {task.nightsCount ? `${task.nightsCount} nights` : ""}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          {task.requests?.toLowerCase().includes("luggage") && (
+            <span className="inline-flex items-center gap-1 text-xs"><Luggage className="size-3" /> Luggage</span>
+          )}
+          {task.requests?.toLowerCase().includes("parking") && (
+            <span className="inline-flex items-center gap-1 text-xs"><Car className="size-3" /> Parking</span>
+          )}
+          {task.requests?.toLowerCase().includes("baby") && (
+            <span className="inline-flex items-center gap-1 text-xs"><Baby className="size-3" /> Baby</span>
+          )}
+          {task.type === "REPAIR" && (
+            <span className="inline-flex items-center gap-1 text-xs"><Wrench className="size-3" /> Repair</span>
+          )}
+        </div>
+
+        {task.instructions && (
+          <p className="text-sm text-muted-foreground line-clamp-1">{task.instructions}</p>
+        )}
+      </div>
+    </Link>
+  );
+}
