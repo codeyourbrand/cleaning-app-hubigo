@@ -3,6 +3,11 @@ import { cookies } from "next/headers";
 import { Role } from "@prisma/client";
 
 const SESSION_COOKIE = "hubigo_session";
+
+if (process.env.NODE_ENV === "production" && !process.env.AUTH_SECRET) {
+  throw new Error("AUTH_SECRET must be set in production");
+}
+
 const AUTH_SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "dev-secret-change-me",
 );

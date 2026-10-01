@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:migrate:dev": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "db:create-admin": "tsx scripts/create-admin.ts",
     "db:studio": "prisma studio",
     "test": "vitest run",
     "test:e2e": "playwright test"

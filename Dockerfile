@@ -8,6 +8,16 @@ FROM base AS deps
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
 
+# Migration runner
+FROM base AS migrate
+COPY --from=deps /app/node_modules ./node_modules
+COPY prisma ./prisma
+COPY scripts ./scripts
+COPY lib ./lib
+COPY package.json tsconfig.json ./
+RUN npx prisma generate
+CMD ["npx", "prisma", "migrate", "deploy"]
+
 # Development image
 FROM base AS dev
 COPY --from=deps /app/node_modules ./node_modules
@@ -22,6 +32,9 @@ FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx prisma generate
+# Build-time placeholder so the production AUTH_SECRET guard passes during
+# page-data collection; the real secret is injected at runtime via env_file.
+ENV AUTH_SECRET=build-time-placeholder
 RUN npm run build
 
 # Production runner
@@ -36,7 +49,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
 
-RUN mkdir -p public/uploads && chown -R nextjs:nodejs public/uploads
+ENV LOCAL_UPLOAD_DIR=/app/uploads
+RUN mkdir -p /app/uploads && chown -R nextjs:nodejs /app/uploads
 
 USER nextjs
 EXPOSE 3000

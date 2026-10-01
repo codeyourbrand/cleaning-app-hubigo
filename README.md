@@ -93,15 +93,98 @@ This starts PostgreSQL and the Next.js app, runs migrations, and seeds the datab
 
 ## Production deployment
 
-1. Set `NODE_ENV=production` and all S3/Hostfully/Web Push env vars.
-2. Build and run the production Dockerfile:
+`docker-compose.prod.yml` runs three services on a VPS: `postgres` (internal only, no host port), `migrate` (one-shot `prisma migrate deploy`), and `app` (Next.js standalone, published on `127.0.0.1:APP_PORT` only). Uploads live in the named volume `hubigo-uploads`, served through an authenticated route at `/uploads/<key>`. It is designed to coexist with other dockerized apps on the same host — nothing is bound to a public interface.
+
+### 1. Clone and configure
 
 ```bash
-docker build --target runner -t hubigo .
-docker run -p 3000:3000 --env-file .env hubigo
+git clone <repo-url> cleaning-app-hubigo
+cd cleaning-app-hubigo
+cp .env.example .env
 ```
 
-3. Use a reverse proxy (e.g. Nginx/Caddy) with HTTPS for PWA and web push to work.
+Mandatory values in `.env`:
+
+```env
+# openssl rand -base64 32
+AUTH_SECRET="<generated>"
+POSTGRES_PASSWORD="<generated>"
+NEXT_PUBLIC_APP_URL="https://cleaning.loadly.pl"
+APP_PORT="3100"
+```
+
+`AUTH_SECRET` is required in production — the app refuses to boot without it.
+
+### 2. Deploy
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+The `migrate` service runs `prisma migrate deploy` and exits; `app` starts only after migrations succeed.
+
+> **Note:** the dev Compose stack seeds demo data; the prod stack does **not**. The demo accounts (`coordinator@hubigo.local`, etc.) do not exist in production.
+
+### 3. Create the first admin
+
+```bash
+docker compose -f docker-compose.prod.yml run --rm \
+  -e ADMIN_NAME="Admin" \
+  -e ADMIN_EMAIL="admin@example.com" \
+  -e ADMIN_PASSWORD="<at least 10 chars>" \
+  migrate npx tsx scripts/create-admin.ts
+```
+
+### 4. Updates
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### 5. Backup
+
+```bash
+docker exec hubigo-postgres pg_dump -U hubigo hubigo > backup.sql
+```
+
+The uploads volume can be archived with `docker run --rm -v hubigo_hubigo-uploads:/data -v "$PWD":/backup alpine tar czf /backup/uploads.tar.gz -C /data .` (adjust the volume name to your Compose project name).
+
+### 6. Reverse proxy
+
+#### Nginx
+
+```nginx
+server {
+    server_name cleaning.loadly.pl;
+    client_max_body_size 12m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3100;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+Then issue a certificate: `sudo certbot --nginx -d cleaning.loadly.pl`.
+
+#### Caddy
+
+```caddy
+cleaning.loadly.pl {
+    request_body {
+        max_size 12MB
+    }
+    reverse_proxy 127.0.0.1:3100
+}
+```
+
+Caddy obtains and renews the TLS certificate automatically.
 
 ## Hostfully integration
 

@@ -48,7 +48,7 @@ class LocalStorageProvider implements StorageProvider {
   private publicBase: string;
 
   constructor() {
-    this.uploadDir = process.env.LOCAL_UPLOAD_DIR ?? "public/uploads";
+    this.uploadDir = process.env.LOCAL_UPLOAD_DIR ?? "uploads";
     this.publicBase = "/uploads";
   }
 
@@ -59,22 +59,20 @@ class LocalStorageProvider implements StorageProvider {
   ): Promise<StoredFile> {
     validateFile(file, contentType);
     const key = generateKey(originalName);
-    const dest = path.join(
-      /*turbopackIgnore: true*/ process.cwd(),
-      this.uploadDir,
-      key,
-    );
+    const dir = path.isAbsolute(this.uploadDir)
+      ? this.uploadDir
+      : path.join(/*turbopackIgnore: true*/ process.cwd(), this.uploadDir);
+    const dest = path.join(dir, key);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, file);
     return { url: `${this.publicBase}/${key}`, key };
   }
 
   async delete(key: string): Promise<void> {
-    const dest = path.join(
-      /*turbopackIgnore: true*/ process.cwd(),
-      this.uploadDir,
-      key,
-    );
+    const dir = path.isAbsolute(this.uploadDir)
+      ? this.uploadDir
+      : path.join(/*turbopackIgnore: true*/ process.cwd(), this.uploadDir);
+    const dest = path.join(dir, key);
     try {
       await fs.unlink(dest);
     } catch {

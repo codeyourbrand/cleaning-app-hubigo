@@ -1,0 +1,54 @@
+name: hubigo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: hubigo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hubigo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-hubigo}
+    volumes:
+      - hubigo-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      target: migrate
+    container_name: hubigo-migrate
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hubigo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hubigo}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  app:
+    build:
+      context: .
+      target: runner
+    container_name: hubigo-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hubigo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hubigo}?schema=public
+      LOCAL_UPLOAD_DIR: /app/uploads
+    ports:
+      - "127.0.0.1:${APP_PORT:-3100}:3000"
+    volumes:
+      - hubigo-uploads:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  hubigo-postgres-data:
+  hubigo-uploads:

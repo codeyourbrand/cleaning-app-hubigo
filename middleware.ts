@@ -3,6 +3,11 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "hubigo_session";
+
+if (process.env.NODE_ENV === "production" && !process.env.AUTH_SECRET) {
+  throw new Error("AUTH_SECRET must be set in production");
+}
+
 const AUTH_SECRET = new TextEncoder().encode(
   process.env.AUTH_SECRET ?? "dev-secret-change-me",
 );
@@ -14,6 +19,9 @@ const publicPaths = [
   "/manifest.json",
   "/sw.js",
   "/offline",
+  // Uploads are served by an authenticated route handler that
+  // returns 401 itself for any file extension.
+  "/uploads",
 ];
 
 export async function middleware(req: NextRequest) {
