@@ -1,17 +1,18 @@
 FROM node:20-alpine AS base
 
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl build-base python3
 WORKDIR /app
 
 # Dependencies
 FROM base AS deps
 COPY package*.json ./
-RUN npm ci
+RUN npm install --legacy-peer-deps
 
 # Development image
 FROM base AS dev
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN npx prisma generate
 ENV NODE_ENV=development
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
