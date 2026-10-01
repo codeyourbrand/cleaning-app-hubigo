@@ -4,10 +4,17 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "hubigo_session";
 const AUTH_SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "dev-secret-change-me"
+  process.env.AUTH_SECRET ?? "dev-secret-change-me",
 );
 
-const publicPaths = ["/login", "/_next", "/api/auth", "/manifest.json", "/icon.svg", "/sw.js", "/offline"];
+const publicPaths = [
+  "/login",
+  "/_next",
+  "/api/auth",
+  "/manifest.json",
+  "/sw.js",
+  "/offline",
+];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
