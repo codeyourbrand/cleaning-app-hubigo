@@ -41,6 +41,11 @@ services:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-hubigo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hubigo}?schema=public
       LOCAL_UPLOAD_DIR: /app/uploads
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:?set NEXT_PUBLIC_APP_URL in .env}
+      HOSTFULLY_API_KEY: ${HOSTFULLY_API_KEY:-}
+      HOSTFULLY_AGENCY_UID: ${HOSTFULLY_AGENCY_UID:-}
+      HOSTFULLY_API_BASE_URL: ${HOSTFULLY_API_BASE_URL:-https://api.hostfully.com/api/v3.3}
+      HOSTFULLY_WEBHOOK_SECRET: ${HOSTFULLY_WEBHOOK_SECRET:-}
     ports:
       - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3100}:3000"
     volumes:

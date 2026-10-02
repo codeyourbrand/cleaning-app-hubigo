@@ -14,22 +14,40 @@ type SyncEvent = {
   error: string | null;
 };
 
+type IntegrationStatus = {
+  configured: boolean;
+  webhookConfigured: boolean;
+  environment: "sandbox" | "production";
+  lastSync: string | null;
+  events: SyncEvent[];
+};
+
+type SyncResult = {
+  properties: number;
+  reservations: number;
+  tasksCreated: number;
+  tasksUpdated: number;
+  tasksCancelled: number;
+  skipped: number;
+  errors: { message: string; leadUid?: string }[];
+};
+
 export default function IntegrationsPage() {
-  const [status, setStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
-  const [lastSync, setLastSync] = useState<string | null>(null);
-  const [events, setEvents] = useState<SyncEvent[]>([]);
+  const [data, setData] = useState<IntegrationStatus | null>(null);
+  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   async function load() {
-    setStatus("loading");
+    setLoading(true);
     try {
       const res = await fetch("/api/coordinator/integrations/hostfully");
-      const data = await res.json();
-      setStatus(data.configured ? "ok" : "error");
-      setLastSync(data.lastSync);
-      setEvents(data.events || []);
+      setData(await res.json());
     } catch {
-      setStatus("error");
+      setData(null);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -39,17 +57,39 @@ export default function IntegrationsPage() {
 
   async function syncNow() {
     setSyncing(true);
+    setSyncResult(null);
     try {
       const res = await fetch("/api/hostfully/sync", { method: "POST" });
+      const body = await res.json();
       if (res.ok) {
-        toast.success("Sync started");
+        setSyncResult(body);
+        toast.success("Sync finished");
       } else {
-        const data = await res.json();
-        toast.error(data.error || "Sync failed");
+        toast.error(body.error || "Sync failed");
       }
     } finally {
       setSyncing(false);
       await load();
+    }
+  }
+
+  async function registerWebhooks() {
+    setRegistering(true);
+    try {
+      const res = await fetch(
+        "/api/coordinator/integrations/hostfully/webhooks",
+        { method: "POST" },
+      );
+      const body = await res.json();
+      if (res.ok) {
+        toast.success(
+          `Webhooks registered: ${body.created.length} created, ${body.existing.length} already present`,
+        );
+      } else {
+        toast.error(body.error || "Registration failed");
+      }
+    } finally {
+      setRegistering(false);
     }
   }
 
@@ -60,40 +100,97 @@ export default function IntegrationsPage() {
       <section className="rounded-2xl border bg-card p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Hostfully</h2>
-          {status === "loading" ? <Skeleton className="h-6 w-20" /> : <Badge variant={status === "ok" ? "default" : "destructive"}>{status === "ok" ? "Connected" : "Not configured"}</Badge>}
+          <div className="flex items-center gap-2">
+            {data && (
+              <Badge variant="outline">
+                {data.environment === "sandbox" ? "Sandbox" : "Production"}
+              </Badge>
+            )}
+            {loading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <Badge variant={data?.configured ? "default" : "destructive"}>
+                {data?.configured ? "Connected" : "Not configured"}
+              </Badge>
+            )}
+          </div>
         </div>
-        <p className="text-sm text-muted-foreground">Last sync: {lastSync ? new Date(lastSync).toLocaleString() : "Never"}</p>
+        <p className="text-sm text-muted-foreground">
+          Last sync:{" "}
+          {data?.lastSync ? new Date(data.lastSync).toLocaleString() : "Never"}
+        </p>
         <div className="flex gap-2">
-          <Button onClick={syncNow} disabled={syncing}>{syncing ? "Syncing..." : "Sync now"}</Button>
+          <Button onClick={syncNow} disabled={syncing}>
+            {syncing ? "Syncing..." : "Sync now"}
+          </Button>
         </div>
+        {syncResult && (
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>
+              {syncResult.properties} properties, {syncResult.reservations}{" "}
+              reservations — {syncResult.tasksCreated} created,{" "}
+              {syncResult.tasksUpdated} updated, {syncResult.tasksCancelled}{" "}
+              cancelled, {syncResult.skipped} skipped
+            </p>
+            {syncResult.errors.length > 0 && (
+              <p className="text-destructive">
+                {syncResult.errors.length} error(s):{" "}
+                {syncResult.errors[0].message}
+                {syncResult.errors.length > 1 ? " …" : ""}
+              </p>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border bg-card p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Webhooks</h2>
+          {data && (
+            <Badge variant={data.webhookConfigured ? "default" : "destructive"}>
+              {data.webhookConfigured ? "Secret set" : "Secret missing"}
+            </Badge>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Hostfully webhooks are registered automatically for all booking and
+          property events. The callback URL embeds the shared secret from
+          HOSTFULLY_WEBHOOK_SECRET — keep it private.
+        </p>
+        <Button
+          variant="outline"
+          onClick={registerWebhooks}
+          disabled={registering || !data?.configured}
+        >
+          {registering ? "Registering..." : "Register webhooks"}
+        </Button>
       </section>
 
       <section>
         <h2 className="text-lg font-semibold mb-3">Recent sync events</h2>
         <div className="space-y-2">
-          {events.length === 0 && <p className="text-sm text-muted-foreground">No events yet.</p>}
-          {events.map((e) => (
+          {!data?.events.length && (
+            <p className="text-sm text-muted-foreground">No events yet.</p>
+          )}
+          {data?.events.map((e) => (
             <div key={e.id} className="rounded-2xl border bg-card p-4">
               <div className="flex items-center justify-between">
                 <p className="font-medium">{e.eventType}</p>
-                <Badge variant={e.status === "PROCESSED" ? "outline" : "destructive"}>{e.status}</Badge>
+                <Badge
+                  variant={e.status === "PROCESSED" ? "outline" : "destructive"}
+                >
+                  {e.status}
+                </Badge>
               </div>
-              <p className="text-xs text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</p>
-              {e.error && <p className="text-sm text-destructive mt-1">{e.error}</p>}
+              <p className="text-xs text-muted-foreground">
+                {new Date(e.createdAt).toLocaleString()}
+              </p>
+              {e.error && (
+                <p className="text-sm text-destructive mt-1">{e.error}</p>
+              )}
             </div>
           ))}
         </div>
-      </section>
-
-      <section className="rounded-2xl border bg-card p-4">
-        <h2 className="text-lg font-semibold mb-2">Webhook setup</h2>
-        <p className="text-sm text-muted-foreground">
-          Point Hostfully webhook URL to:
-        </p>
-        <code className="block mt-2 p-2 bg-muted rounded text-xs break-all">
-          {typeof window !== "undefined" ? `${window.location.origin}/api/hostfully/webhook` : ""}
-        </code>
-        <p className="text-sm text-muted-foreground mt-2">Event types: NEW_BOOKING, BOOKING_UPDATED, BOOKING_CANCELLED, NEW_PROPERTY, UPDATED_PROPERTY</p>
       </section>
     </div>
   );

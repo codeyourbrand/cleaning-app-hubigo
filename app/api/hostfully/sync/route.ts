@@ -14,6 +14,6 @@ export const POST = withRole([Role.COORDINATOR], async (req: NextRequest) => {
   } catch {
     // ignore optional body
   }
-  const result = await syncHostfully(since);
+  const result = await syncHostfully(since ? { since } : undefined);
   return NextResponse.json(result);
 });

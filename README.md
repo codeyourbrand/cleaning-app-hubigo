@@ -196,31 +196,25 @@ Set these environment variables:
 
 ```env
 HOSTFULLY_API_KEY="your-api-key"
-HOSTFULLY_API_BASE_URL="https://api.hostfully.com/v2"
-HOSTFULLY_WEBHOOK_SECRET="random-secret-for-signature-verification"
+HOSTFULLY_AGENCY_UID="your-agency-uid"
+HOSTFULLY_API_BASE_URL="https://api.hostfully.com/api/v3.3"
+HOSTFULLY_WEBHOOK_SECRET="random-secret-for-callback-token"
 ```
 
-Get your API key from Agency Settings in Hostfully. The integration uses header `X-HOSTFULLY-APIKEY`.
+Get your API key and agency UID from Agency Settings in Hostfully. The integration uses header `X-HOSTFULLY-APIKEY` and API v3.3 (for the sandbox use `HOSTFULLY_API_BASE_URL="https://sandbox-api.hostfully.com/api/v3.3"`).
 
 ### Webhook setup
 
-Register a webhook in Hostfully pointing to:
+Hostfully sends no signature header, so the callback URL carries a shared secret: `/api/hostfully/webhook?token=<HOSTFULLY_WEBHOOK_SECRET>`. Webhooks are registered automatically — in the coordinator UI go to **Coordinator → Settings → Integrations → Register webhooks**, or call:
 
+```bash
+curl -X POST https://your-domain/api/coordinator/integrations/hostfully/webhooks \
+  -H "Cookie: hubigo_session=..."
 ```
-https://your-domain/api/hostfully/webhook
-```
 
-Subscribe to these event types:
+This creates one webhook per event type (`NEW_BOOKING`, `BOOKING_UPDATED`, `BOOKING_CANCELLED`, `LEAD_DATES_CHANGED`, `LEAD_PROPERTY_CHANGED`, `LEAD_SOFT_DELETED`, `NEW_PROPERTY`, `UPDATED_PROPERTY`, `ACTIVATED_PROPERTY`, `DEACTIVATED_PROPERTY`, `DELETED_PROPERTY`), skipping any already registered.
 
-- `NEW_BOOKING`
-- `BOOKING_UPDATED`
-- `BOOKING_CANCELLED`
-- `NEW_PROPERTY`
-- `UPDATED_PROPERTY`
-- `ACTIVATED_PROPERTY`
-- `DEACTIVATED_PROPERTY`
-
-The webhook handler verifies signatures when `HOSTFULLY_WEBHOOK_SECRET` is set, records sync events, and normalizes reservations into Hubigo apartments and cleaning tasks.
+The handler verifies the `?token=` against `HOSTFULLY_WEBHOOK_SECRET`, checks `agency_uid` matches `HOSTFULLY_AGENCY_UID`, records a sync event, and normalizes reservations into Hubigo apartments and cleaning tasks.
 
 ### Manual sync fallback
 
