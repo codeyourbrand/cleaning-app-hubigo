@@ -212,7 +212,7 @@ curl -X POST https://your-domain/api/coordinator/integrations/hostfully/webhooks
   -H "Cookie: hubigo_session=..."
 ```
 
-This creates one webhook per event type (`NEW_BOOKING`, `BOOKING_UPDATED`, `BOOKING_CANCELLED`, `LEAD_DATES_CHANGED`, `LEAD_PROPERTY_CHANGED`, `LEAD_SOFT_DELETED`, `NEW_PROPERTY`, `UPDATED_PROPERTY`, `ACTIVATED_PROPERTY`, `DEACTIVATED_PROPERTY`, `DELETED_PROPERTY`), skipping any already registered.
+This creates one webhook per event type (`NEW_BOOKING`, `BOOKING_UPDATED`, `BOOKING_CANCELLED`, `PROPERTY_AVAILABILITY_UPDATED` (covers date changes, holds and soft deletes), `NEW_PROPERTY`, `UPDATED_PROPERTY`, `ACTIVATED_PROPERTY`, `DEACTIVATED_PROPERTY`, `DELETED_PROPERTY`), skipping any already registered.
 
 The handler verifies the `?token=` against `HOSTFULLY_WEBHOOK_SECRET`, checks `agency_uid` matches `HOSTFULLY_AGENCY_UID`, records a sync event, and normalizes reservations into Hubigo apartments and cleaning tasks.
 
