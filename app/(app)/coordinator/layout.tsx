@@ -87,7 +87,7 @@ export default function CoordinatorLayout({
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="hidden md:flex w-64 flex-col bg-sidebar text-sidebar-foreground p-4">
+      <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground p-4 sticky top-0 h-screen overflow-y-auto">
         <div className="mb-8 px-2 pt-2">
           <HubigoLogo />
         </div>
