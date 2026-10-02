@@ -242,6 +242,7 @@ export async function createWebhook(input: {
     method: "POST",
     body: JSON.stringify({
       agencyUid,
+      objectUid: agencyUid,
       webhookType: "POST_JSON",
       eventType: input.eventType,
       callbackUrl: input.callbackUrl,
