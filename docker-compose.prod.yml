@@ -42,7 +42,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hubigo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hubigo}?schema=public
       LOCAL_UPLOAD_DIR: /app/uploads
     ports:
-      - "127.0.0.1:${APP_PORT:-3100}:3000"
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3100}:3000"
     volumes:
       - hubigo-uploads:/app/uploads
     depends_on:
