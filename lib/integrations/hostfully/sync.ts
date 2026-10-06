@@ -13,6 +13,11 @@ import {
 import { logAudit } from "@/lib/audit";
 import { Prisma, Role, TaskType, TaskStatus } from "@prisma/client";
 import { differenceInCalendarDays, addDays } from "date-fns";
+import {
+  sendWhatsAppNotification,
+  buildTaskCreatedMessage,
+  buildRefreshCreatedMessage,
+} from "@/lib/whatsapp";
 
 export const ACTIVE_STATUSES = new Set([
   "BOOKED",
@@ -354,7 +359,13 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
       externalHostfullyReservationId: lead.uid,
       createdByUserId: ctx.coordinatorId,
     },
+    include: { apartment: true },
   });
+
+  // WhatsApp notification for new Hostfully task
+  sendWhatsAppNotification("TASK_CREATED", buildTaskCreatedMessage(task)).catch(
+    () => {},
+  );
 
   // Auto-generate REFRESH tasks for long stays
   const refreshTasks = await generateRefreshTasks(
@@ -438,8 +449,14 @@ async function generateRefreshTasks(
         nightsCount: mapped.nightsCount,
         createdByUserId: ctx.coordinatorId,
       },
+      include: { apartment: true },
     });
     created.push(refreshTask);
+
+    sendWhatsAppNotification(
+      "REFRESH_CREATED",
+      buildRefreshCreatedMessage(refreshTask),
+    ).catch(() => {});
   }
   return created;
 }

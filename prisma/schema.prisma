@@ -309,6 +309,16 @@ model InventoryChecklist {
   @@map("inventory_checklists")
 }
 
+model WhatsAppNotificationSetting {
+  id        String   @id @default(cuid())
+  eventType String   @unique @map("event_type")
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("whatsapp_notification_settings")
+}
+
 model InventoryItem {
   id          String   @id @default(cuid())
   checklistId String   @map("checklist_id")

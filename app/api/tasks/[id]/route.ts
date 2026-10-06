@@ -4,39 +4,46 @@ import { prisma } from "@/lib/prisma";
 import { taskUpdateSchema } from "@/lib/schemas";
 import { Role } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
+import {
+  sendWhatsAppNotification,
+  buildTaskAssignedMessage,
+} from "@/lib/whatsapp";
 
-export const GET = withRole([Role.CLEANER, Role.COORDINATOR], async (_req, ctx) => {
-  const id = ctx.params?.id as string;
-  const task = await prisma.task.findUnique({
-    where: { id },
-    include: {
-      apartment: true,
-      assignedTo: { select: { id: true, name: true, avatarUrl: true } },
-      createdBy: { select: { id: true, name: true } },
-      startedBy: { select: { id: true, name: true } },
-      doneBy: { select: { id: true, name: true } },
-      steps: { orderBy: { order: "asc" } },
-      media: true,
-      comments: {
-        orderBy: { createdAt: "asc" },
-        include: {
-          author: { select: { id: true, name: true, avatarUrl: true } },
-          media: true,
-          replies: {
-            include: {
-              author: { select: { id: true, name: true, avatarUrl: true } },
-              media: true,
+export const GET = withRole(
+  [Role.CLEANER, Role.COORDINATOR],
+  async (_req, ctx) => {
+    const id = ctx.params?.id as string;
+    const task = await prisma.task.findUnique({
+      where: { id },
+      include: {
+        apartment: true,
+        assignedTo: { select: { id: true, name: true, avatarUrl: true } },
+        createdBy: { select: { id: true, name: true } },
+        startedBy: { select: { id: true, name: true } },
+        doneBy: { select: { id: true, name: true } },
+        steps: { orderBy: { order: "asc" } },
+        media: true,
+        comments: {
+          orderBy: { createdAt: "asc" },
+          include: {
+            author: { select: { id: true, name: true, avatarUrl: true } },
+            media: true,
+            replies: {
+              include: {
+                author: { select: { id: true, name: true, avatarUrl: true } },
+                media: true,
+              },
             },
           },
         },
       },
-    },
-  });
-  if (!task) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-  return NextResponse.json({ task });
-});
+    });
+    if (!task) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ task });
+  },
+);
 
 export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
   const id = ctx.params?.id as string;
@@ -45,7 +52,7 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid input", issues: parsed.error.flatten().fieldErrors },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -68,6 +75,26 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
     oldValue: oldTask,
     newValue: task,
   });
+
+  // WhatsApp notification when someone gets assigned
+  if (
+    data.assignedToUserId &&
+    data.assignedToUserId !== oldTask.assignedToUserId
+  ) {
+    const fullTask = await prisma.task.findUnique({
+      where: { id },
+      include: {
+        apartment: true,
+        assignedTo: { select: { name: true } },
+      },
+    });
+    if (fullTask) {
+      sendWhatsAppNotification(
+        "TASK_ASSIGNED",
+        buildTaskAssignedMessage(fullTask),
+      ).catch(() => {});
+    }
+  }
 
   return NextResponse.json({ task });
 });

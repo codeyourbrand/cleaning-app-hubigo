@@ -16,6 +16,7 @@ import {
   Menu,
   Package,
   ScrollText,
+  MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -30,6 +31,11 @@ const links = [
   { href: "/coordinator/users", label: "Users", icon: Users },
   { href: "/coordinator/import", label: "Import", icon: Upload },
   { href: "/coordinator/history", label: "Logs", icon: ScrollText },
+  {
+    href: "/coordinator/notifications",
+    label: "WhatsApp",
+    icon: MessageSquare,
+  },
   {
     href: "/coordinator/settings/integrations",
     label: "Hostfully",

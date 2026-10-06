@@ -5,6 +5,11 @@ import { taskCreateSchema } from "@/lib/schemas";
 import { Role, TaskStatus } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 import { startOfDay, endOfDay, parseISO } from "date-fns";
+import {
+  sendWhatsAppNotification,
+  buildTaskCreatedMessage,
+  buildTaskAssignedMessage,
+} from "@/lib/whatsapp";
 
 export const GET = withRole(
   [Role.CLEANER, Role.COORDINATOR],
@@ -109,6 +114,27 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
       action: "TASK_ASSIGNED",
       newValue: { assignedToUserId },
     });
+  }
+
+  // WhatsApp notifications (fire-and-forget)
+  const fullTask = await prisma.task.findUnique({
+    where: { id: task.id },
+    include: {
+      apartment: true,
+      assignedTo: { select: { name: true } },
+    },
+  });
+  if (fullTask) {
+    sendWhatsAppNotification(
+      "TASK_CREATED",
+      buildTaskCreatedMessage(fullTask),
+    ).catch(() => {});
+    if (assignedToUserId) {
+      sendWhatsAppNotification(
+        "TASK_ASSIGNED",
+        buildTaskAssignedMessage(fullTask),
+      ).catch(() => {});
+    }
   }
 
   return NextResponse.json({ task }, { status: 201 });

@@ -3,6 +3,10 @@ import { withRole } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { Role, TaskStatus } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
+import {
+  sendWhatsAppNotification,
+  buildTaskCompletedMessage,
+} from "@/lib/whatsapp";
 
 export const POST = withRole(
   [Role.CLEANER, Role.COORDINATOR],
@@ -52,6 +56,16 @@ export const POST = withRole(
       oldValue: { status: task.status },
       newValue: { status: updated.status, doneAt: now },
     });
+
+    // WhatsApp notification
+    const doneUser = await prisma.user.findUnique({
+      where: { id: ctx.user.userId },
+      select: { name: true },
+    });
+    sendWhatsAppNotification(
+      "TASK_COMPLETED",
+      buildTaskCompletedMessage({ ...updated, doneBy: doneUser }),
+    ).catch(() => {});
 
     return NextResponse.json({ task: updated });
   },
