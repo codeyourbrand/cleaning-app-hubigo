@@ -415,34 +415,40 @@ function TaskDetail({ taskId }: { taskId: string }) {
 
       <Section title="Cleaning plan">
         <div className="space-y-2">
-          {task.steps.map((step) => (
-            <button
-              key={step.id}
-              onClick={() => toggleStep(step.id, !step.done)}
-              className="w-full flex items-center gap-3 p-3 rounded-xl border hover:bg-muted transition-colors text-left"
-              aria-pressed={step.done}
-            >
-              {step.done ? (
-                <CheckCircle2 className="size-6 text-emerald-600 shrink-0" />
-              ) : (
-                <Circle className="size-6 text-muted-foreground shrink-0" />
-              )}
-              <div className="flex-1">
-                <p
-                  className={
-                    step.done ? "line-through text-muted-foreground" : ""
-                  }
-                >
-                  {step.name}
-                </p>
-                {step.doneAt && (
-                  <p className="text-xs text-muted-foreground">
-                    Done {new Date(step.doneAt).toLocaleTimeString()}
-                  </p>
+          {task.steps.map((step) => {
+            const locked = task.status === "DONE";
+            return (
+              <button
+                key={step.id}
+                onClick={() => !locked && toggleStep(step.id, !step.done)}
+                disabled={locked}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
+                  locked ? "opacity-60 cursor-not-allowed" : "hover:bg-muted"
+                }`}
+                aria-pressed={step.done}
+              >
+                {step.done ? (
+                  <CheckCircle2 className="size-6 text-emerald-600 shrink-0" />
+                ) : (
+                  <Circle className="size-6 text-muted-foreground shrink-0" />
                 )}
-              </div>
-            </button>
-          ))}
+                <div className="flex-1">
+                  <p
+                    className={
+                      step.done ? "line-through text-muted-foreground" : ""
+                    }
+                  >
+                    {step.name}
+                  </p>
+                  {step.doneAt && (
+                    <p className="text-xs text-muted-foreground">
+                      Done {new Date(step.doneAt).toLocaleTimeString()}
+                    </p>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
         {allStepsDone && task.status !== "DONE" && (
           <p className="mt-2 text-sm text-emerald-600 font-medium">
