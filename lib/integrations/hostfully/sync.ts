@@ -18,6 +18,7 @@ import {
   buildTaskCreatedMessage,
   buildRefreshCreatedMessage,
 } from "@/lib/whatsapp";
+import { DEFAULT_APARTMENT_INVENTORY } from "@/lib/inventory-template";
 
 export const ACTIVE_STATUSES = new Set([
   "BOOKED",
@@ -110,8 +111,14 @@ export function mapPropertyToApartment(property: HostfullyProperty) {
  * Match strictly by externalHostfullyId — property names are not unique.
  * Creates only for active properties; on (number, building) unique
  * collision retries once with a uid suffix.
+ *
+ * When a NEW apartment is created, auto-generates an inventory checklist
+ * from the default template.
  */
-async function findOrCreateApartment(property: HostfullyProperty) {
+async function findOrCreateApartment(
+  property: HostfullyProperty,
+  coordinatorId?: string,
+) {
   const existing = await prisma.apartment.findUnique({
     where: { externalHostfullyId: property.uid },
   });
@@ -123,8 +130,10 @@ async function findOrCreateApartment(property: HostfullyProperty) {
     });
   }
   if (property.isActive === false) return null;
+
+  let apartment;
   try {
-    return await prisma.apartment.create({
+    apartment = await prisma.apartment.create({
       data: { ...mapped, externalHostfullyId: property.uid },
     });
   } catch (err) {
@@ -132,16 +141,56 @@ async function findOrCreateApartment(property: HostfullyProperty) {
       err instanceof Prisma.PrismaClientKnownRequestError &&
       err.code === "P2002"
     ) {
-      return prisma.apartment.create({
+      apartment = await prisma.apartment.create({
         data: {
           ...mapped,
           number: `${mapped.number} (${property.uid.slice(0, 6)})`,
           externalHostfullyId: property.uid,
         },
       });
+    } else {
+      throw err;
     }
-    throw err;
   }
+
+  // Auto-create default inventory checklist for the new apartment
+  if (apartment && coordinatorId) {
+    try {
+      await createDefaultChecklist(apartment.id, coordinatorId);
+    } catch {
+      // Don't fail the sync if checklist creation fails
+    }
+  }
+
+  return apartment;
+}
+
+async function createDefaultChecklist(
+  apartmentId: string,
+  coordinatorId: string,
+) {
+  // Check if a checklist already exists for this apartment
+  const existingChecklist = await prisma.inventoryChecklist.findFirst({
+    where: { apartmentId },
+  });
+  if (existingChecklist) return existingChecklist;
+
+  return prisma.inventoryChecklist.create({
+    data: {
+      name: "Inventory",
+      type: "APARTMENT",
+      apartmentId,
+      createdByUserId: coordinatorId,
+      items: {
+        create: DEFAULT_APARTMENT_INVENTORY.map((item, idx) => ({
+          name: item.name,
+          quantity: item.quantity,
+          notes: item.notes ?? null,
+          order: idx,
+        })),
+      },
+    },
+  });
 }
 
 interface SyncContext {
@@ -256,7 +305,7 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
     };
   }
 
-  const apartment = await findOrCreateApartment(property);
+  const apartment = await findOrCreateApartment(property, ctx.coordinatorId);
   if (!apartment) {
     return {
       reservation,
@@ -493,7 +542,8 @@ export async function syncHostfully(opts?: { since?: Date }) {
     for (const property of properties) {
       try {
         ctx.propertyCache.set(property.uid, property);
-        if (await findOrCreateApartment(property)) results.properties++;
+        if (await findOrCreateApartment(property, ctx.coordinatorId))
+          results.properties++;
       } catch (err) {
         results.errors.push({
           message: `Property ${property.uid}: ${(err as Error).message}`,
@@ -574,7 +624,8 @@ export async function syncHostfullyLead(leadUid: string) {
 export async function syncHostfullyProperty(propertyUid: string) {
   const property = await getProperty(propertyUid);
   if (!property) return null;
-  return findOrCreateApartment(property);
+  const coordinatorId = await resolveCoordinatorId();
+  return findOrCreateApartment(property, coordinatorId);
 }
 
 export async function registerHostfullyWebhooks(callbackUrl: string) {
