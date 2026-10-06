@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTimeSeconds } from "@/lib/datetime";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import {
@@ -265,14 +266,7 @@ function LogEntry({ log }: { log: LogRecord }) {
             </span>
             <span className="inline-flex items-center gap-1">
               <Clock className="size-3" />
-              {new Date(log.createdAt).toLocaleString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
+              {formatDateTimeSeconds(log.createdAt)}
             </span>
           </div>
         </div>

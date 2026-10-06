@@ -102,7 +102,7 @@ export default function CleanerTasksPage() {
     if (ds === today) return "Today";
     if (ds === yesterday) return "Yesterday";
     if (ds === tomorrow) return "Tomorrow";
-    return format(new Date(ds + "T12:00:00"), "MMM d");
+    return format(new Date(ds + "T12:00:00"), "dd/MM");
   }
 
   return (
@@ -130,7 +130,7 @@ export default function CleanerTasksPage() {
         >
           {dateStr === todayStr ? "Today" : getDateLabel(dateStr)}
           <span className="ml-1 text-xs opacity-70">
-            {format(currentDate, "MMM d")}
+            {format(currentDate, "dd/MM")}
           </span>
         </Button>
         <Button

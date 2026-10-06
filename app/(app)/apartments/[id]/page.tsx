@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate, formatDateOnly } from "@/lib/datetime";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2 } from "lucide-react";
@@ -74,7 +75,7 @@ function ApartmentDetail({ id }: { id: string }) {
           <div className="space-y-3">
             {apartment.lostFounds.map((item) => (
               <div key={item.id} className="rounded-2xl border bg-card p-4">
-                <p className="text-sm font-medium">{item.reportedBy.name} · {new Date(item.createdAt).toLocaleDateString()}</p>
+                <p className="text-sm font-medium">{item.reportedBy.name} · {formatDate(item.createdAt)}</p>
                 <p className="text-sm mt-1">{item.description}</p>
                 {item.photoUrl && <img src={item.photoUrl} alt="" className="mt-2 size-24 rounded-lg object-cover" />}
               </div>
@@ -91,7 +92,7 @@ function ApartmentDetail({ id }: { id: string }) {
           <div className="space-y-3">
             {apartment.damages.map((item) => (
               <div key={item.id} className="rounded-2xl border bg-card p-4">
-                <p className="text-sm font-medium">{item.reportedBy.name} · {new Date(item.createdAt).toLocaleDateString()}</p>
+                <p className="text-sm font-medium">{item.reportedBy.name} · {formatDate(item.createdAt)}</p>
                 <p className="text-sm mt-1">{item.description}</p>
                 {item.photoUrl && <img src={item.photoUrl} alt="" className="mt-2 size-24 rounded-lg object-cover" />}
               </div>
@@ -110,7 +111,7 @@ function ApartmentDetail({ id }: { id: string }) {
               <Link key={t.id} href={`/tasks/${t.id}`}>
                 <div className="rounded-2xl border bg-card p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{new Date(t.date).toLocaleDateString()}</p>
+                    <p className="text-sm font-medium">{formatDateOnly(t.date)}</p>
                     <span className="text-xs uppercase tracking-wide">{t.status}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{t.assignedTo?.name ?? "Unassigned"}</p>

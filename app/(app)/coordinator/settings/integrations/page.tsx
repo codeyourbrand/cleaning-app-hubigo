@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/datetime";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -117,7 +118,7 @@ export default function IntegrationsPage() {
         </div>
         <p className="text-sm text-muted-foreground">
           Last sync:{" "}
-          {data?.lastSync ? new Date(data.lastSync).toLocaleString() : "Never"}
+          {data?.lastSync ? formatDateTime(data.lastSync) : "Never"}
         </p>
         <div className="flex gap-2">
           <Button onClick={syncNow} disabled={syncing}>
@@ -183,7 +184,7 @@ export default function IntegrationsPage() {
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {new Date(e.createdAt).toLocaleString()}
+                {formatDateTime(e.createdAt)}
               </p>
               {e.error && (
                 <p className="text-sm text-destructive mt-1">{e.error}</p>

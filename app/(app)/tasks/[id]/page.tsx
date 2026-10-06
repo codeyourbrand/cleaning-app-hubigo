@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime, formatTime } from "@/lib/datetime";
 import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -352,12 +353,7 @@ function TaskDetail({ taskId }: { taskId: string }) {
               <Clock className="size-4 text-amber-600" />
               <span>
                 Started:{" "}
-                {new Date(task.startedAt).toLocaleString(undefined, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  day: "numeric",
-                  month: "short",
-                })}
+                {formatDateTime(task.startedAt)}
               </span>
             </div>
           )}
@@ -366,12 +362,7 @@ function TaskDetail({ taskId }: { taskId: string }) {
               <CheckCircle2 className="size-4 text-emerald-600" />
               <span>
                 Finished:{" "}
-                {new Date(task.doneAt).toLocaleString(undefined, {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  day: "numeric",
-                  month: "short",
-                })}
+                {formatDateTime(task.doneAt)}
               </span>
             </div>
           )}
@@ -442,7 +433,7 @@ function TaskDetail({ taskId }: { taskId: string }) {
                   </p>
                   {step.doneAt && (
                     <p className="text-xs text-muted-foreground">
-                      Done {new Date(step.doneAt).toLocaleTimeString()}
+                      Done {formatTime(step.doneAt)}
                     </p>
                   )}
                 </div>
@@ -543,7 +534,7 @@ function CommentTree({
             </div>
             <span className="text-sm font-medium">{c.author.name}</span>
             <span className="text-xs text-muted-foreground">
-              {new Date(c.createdAt).toLocaleString()}
+              {formatDateTime(c.createdAt)}
             </span>
           </div>
           <p className="text-sm mb-2">{c.body}</p>
@@ -584,7 +575,7 @@ function CommentTree({
                     </div>
                     <span className="text-sm font-medium">{r.author.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleString()}
+                      {formatDateTime(r.createdAt)}
                     </span>
                   </div>
                   <p className="text-sm">{r.body}</p>

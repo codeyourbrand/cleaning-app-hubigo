@@ -425,7 +425,7 @@ function DailyView({
         </Button>
         <div className="text-center">
           <div className="text-lg font-bold">
-            {format(date, "EEEE, d MMMM yyyy")}
+            {format(date, "EEEE, dd/MM/yyyy")}
           </div>
           <div className="text-sm text-muted-foreground">
             FOR{" "}
@@ -924,7 +924,7 @@ function WeeklyView({
   }
 
   const weekEnd = addDays(weekStart, 6);
-  const title = `Schedule ${format(weekStart, "d MMM")} – ${format(weekEnd, "d MMM yyyy")}`;
+  const title = `Schedule ${format(weekStart, "dd/MM")} – ${format(weekEnd, "dd/MM/yyyy")}`;
 
   return (
     <div className="space-y-4">
@@ -975,7 +975,7 @@ function WeeklyView({
                   key={d.date}
                   className="px-3 py-2 text-center font-semibold"
                 >
-                  <div>{format(parseISO(d.date), "d MMM")}</div>
+                  <div>{format(parseISO(d.date), "dd/MM")}</div>
                   <div className="text-xs text-muted-foreground font-normal">
                     {d.dayOfWeek}
                   </div>
@@ -1122,7 +1122,7 @@ function WeeklyView({
               >
                 <td className="px-3 py-2 whitespace-nowrap">
                   <div className="font-semibold">
-                    {format(parseISO(day.date), "d MMM")}
+                    {format(parseISO(day.date), "dd/MM")}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     {day.dayOfWeek}

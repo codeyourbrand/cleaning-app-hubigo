@@ -1,3 +1,4 @@
+import { formatDateOnly } from "@/lib/datetime";
 import { prisma } from "./prisma";
 
 const WHAPI_BASE_URL = "https://gate.whapi.cloud";
@@ -116,9 +117,7 @@ export function buildTaskCreatedMessage(task: {
   const name = task.title || task.type;
   const apt = task.apartment?.number ?? "?";
   const date =
-    typeof task.date === "string"
-      ? task.date
-      : task.date.toISOString().slice(0, 10);
+    formatDateOnly(task.date);
   return `📋 *New task*\n${name} — Apt ${apt}\nDate: ${date}`;
 }
 
@@ -133,9 +132,7 @@ export function buildTaskAssignedMessage(task: {
   const apt = task.apartment?.number ?? "?";
   const person = task.assignedTo?.name ?? "?";
   const date =
-    typeof task.date === "string"
-      ? task.date
-      : task.date.toISOString().slice(0, 10);
+    formatDateOnly(task.date);
   return `👤 *${person}* assigned to:\n${name} — Apt ${apt}\nDate: ${date}`;
 }
 
@@ -169,8 +166,6 @@ export function buildRefreshCreatedMessage(task: {
 }): string {
   const apt = task.apartment?.number ?? "?";
   const date =
-    typeof task.date === "string"
-      ? task.date
-      : task.date.toISOString().slice(0, 10);
+    formatDateOnly(task.date);
   return `🔄 *Auto-refresh* created\nApt ${apt}\nDate: ${date}`;
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDate } from "@/lib/datetime";
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -213,7 +214,7 @@ export default function InventoryPage() {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Updated {new Date(c.updatedAt).toLocaleDateString()}
+                  Updated {formatDate(c.updatedAt)}
                 </p>
               </div>
             </Link>

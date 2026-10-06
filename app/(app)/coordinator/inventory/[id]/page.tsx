@@ -1,5 +1,6 @@
 "use client";
 
+import { formatDateTime } from "@/lib/datetime";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -398,12 +399,7 @@ function ChecklistDetail({ checklistId }: { checklistId: string }) {
                     {item.checkedAt && item.checkedBy && (
                       <span>
                         · Checked by {item.checkedBy.name}{" "}
-                        {new Date(item.checkedAt).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
+                        {formatDateTime(item.checkedAt)}
                       </span>
                     )}
                   </div>

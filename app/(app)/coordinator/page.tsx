@@ -324,7 +324,7 @@ function Column({
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold">{title}</h2>
         <span className="text-xs text-muted-foreground">
-          {format(date, "MMM d")}
+          {format(date, "dd/MM")}
         </span>
       </div>
       {tasks.length === 0 && (
