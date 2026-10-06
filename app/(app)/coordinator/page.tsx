@@ -25,6 +25,27 @@ type Board = {
   counts: { todo: number; inProgress: number; done: number };
 };
 
+const TASK_GROUPS = [
+  {
+    key: "checkout",
+    label: "Check-out",
+    types: ["CHECK_OUT"],
+    dot: "bg-slate-800",
+  },
+  {
+    key: "refresh",
+    label: "Refresh",
+    types: ["REFRESH"],
+    dot: "bg-orange-500",
+  },
+  {
+    key: "other",
+    label: "Other",
+    types: ["CLEANING", "REPAIR", "OTHER"],
+    dot: "bg-purple-500",
+  },
+];
+
 function getTaskTypeLabel(type: string, customTypeName?: string | null) {
   switch (type) {
     case "CHECK_OUT":
@@ -306,48 +327,71 @@ function Column({
           {format(date, "MMM d")}
         </span>
       </div>
-      <div className="space-y-3">
-        {tasks.length === 0 && (
-          <p className="text-sm text-muted-foreground">No tasks.</p>
-        )}
-        {tasks.map((t) => (
-          <div
-            key={t.id}
-            draggable
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "move";
-              onDragStart(t.id, columnId);
-            }}
-            className="cursor-grab active:cursor-grabbing"
-          >
-            <Link href={`/tasks/${t.id}`}>
-              <div
-                className={`rounded-xl border p-3 mb-0 hover:shadow-md transition-shadow ${statusBg(t.status)}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-base truncate">
-                      {t.title || getTaskTypeLabel(t.type, t.customTypeName)}
-                    </p>
-                    <p className="text-lg font-bold text-muted-foreground">
-                      {t.apartment.number}
-                    </p>
-                  </div>
-                  <StatusBadge status={t.status} />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {t.apartment.building || "—"}
-                </p>
-                {t.assignedTo && <p className="text-sm">{t.assignedTo.name}</p>}
-                {t.checkoutTime && (
-                  <p className="text-xs text-muted-foreground">
-                    Checkout {t.checkoutTime}
-                  </p>
-                )}
+      {tasks.length === 0 && (
+        <p className="text-sm text-muted-foreground">No tasks.</p>
+      )}
+      <div className="space-y-5">
+        {TASK_GROUPS.map((group) => ({
+          ...group,
+          tasks: tasks.filter((t) => group.types.includes(t.type)),
+        }))
+          .filter((group) => group.tasks.length > 0)
+          .map((group) => (
+            <section key={group.key}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`size-2 rounded-full ${group.dot}`} />
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  {group.label}
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  {group.tasks.length}
+                </span>
               </div>
-            </Link>
-          </div>
-        ))}
+              <div className="space-y-3">
+                {group.tasks.map((t) => (
+                  <div
+                    key={t.id}
+                    draggable
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      onDragStart(t.id, columnId);
+                    }}
+                    className="cursor-grab active:cursor-grabbing"
+                  >
+                    <Link href={`/tasks/${t.id}`}>
+                      <div
+                        className={`rounded-xl border p-3 mb-0 hover:shadow-md transition-shadow ${statusBg(t.status)}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-base truncate">
+                              {t.title ||
+                                getTaskTypeLabel(t.type, t.customTypeName)}
+                            </p>
+                            <p className="text-lg font-bold text-muted-foreground">
+                              {t.apartment.number}
+                            </p>
+                          </div>
+                          <StatusBadge status={t.status} />
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {t.apartment.building || "—"}
+                        </p>
+                        {t.assignedTo && (
+                          <p className="text-sm">{t.assignedTo.name}</p>
+                        )}
+                        {t.checkoutTime && (
+                          <p className="text-xs text-muted-foreground">
+                            Checkout {t.checkoutTime}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
       </div>
     </div>
   );
