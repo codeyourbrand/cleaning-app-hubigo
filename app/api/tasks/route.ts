@@ -54,8 +54,10 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
 
   const {
     apartmentId,
+    title,
     date,
     type,
+    customTypeName,
     checkoutTime,
     checkinWindow,
     guestsCount,
@@ -74,8 +76,10 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
   const task = await prisma.task.create({
     data: {
       apartmentId,
+      title,
       date: normalizedDate,
       type,
+      customTypeName,
       checkoutTime,
       checkinWindow,
       guestsCount,

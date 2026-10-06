@@ -12,9 +12,11 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 
 type TaskWithApartment = {
   id: string;
+  title: string | null;
   date: string;
   status: "TODO" | "IN_PROGRESS" | "DONE";
-  type: "CLEANING" | "REPAIR" | "OTHER";
+  type: "CHECK_OUT" | "REFRESH" | "CLEANING" | "REPAIR" | "OTHER";
+  customTypeName: string | null;
   checkoutTime: string | null;
   checkinWindow: string | null;
   guestsCount: number | null;
@@ -25,8 +27,30 @@ type TaskWithApartment = {
   assignedTo: { id: string; name: string } | null;
 };
 
+function getTaskTypeLabel(type: string, customTypeName?: string | null) {
+  switch (type) {
+    case "CHECK_OUT":
+      return "Check-out";
+    case "REFRESH":
+      return "Refresh";
+    case "CLEANING":
+      return "Cleaning";
+    case "REPAIR":
+      return "Repair";
+    case "OTHER":
+      return customTypeName || "Other";
+    default:
+      return type;
+  }
+}
+
+// Use date strings to avoid timezone comparison issues
+function toDateStr(d: Date): string {
+  return format(d, "yyyy-MM-dd");
+}
+
 export default function CleanerTasksPage() {
-  const [date, setDate] = useState<Date>(new Date());
+  const [dateStr, setDateStr] = useState<string>(toDateStr(new Date()));
   const [tasks, setTasks] = useState<TaskWithApartment[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"my" | "all" | "status">("my");
@@ -36,12 +60,12 @@ export default function CleanerTasksPage() {
 
   useEffect(() => {
     fetchTasks();
-  }, [date, filter, statusFilter]);
+  }, [dateStr, filter, statusFilter]);
 
   async function fetchTasks() {
     setLoading(true);
     const params = new URLSearchParams();
-    params.set("date", format(date, "yyyy-MM-dd"));
+    params.set("date", dateStr);
     if (filter === "my") params.set("myTasks", "true");
     if (filter === "status" && statusFilter) params.set("status", statusFilter);
 
@@ -50,17 +74,36 @@ export default function CleanerTasksPage() {
       const data = await res.json();
       setTasks(data.tasks || []);
     } catch {
-      // offline fallback could read from cache here
       setTasks([]);
     } finally {
       setLoading(false);
     }
   }
 
-  const filteredTasks = tasks.filter((t) =>
-    t.apartment.number.toLowerCase().includes(search.toLowerCase()) ||
-    (t.apartment.building || "").toLowerCase().includes(search.toLowerCase())
+  const filteredTasks = tasks.filter(
+    (t) =>
+      t.apartment.number.toLowerCase().includes(search.toLowerCase()) ||
+      (t.apartment.building || "").toLowerCase().includes(search.toLowerCase()),
   );
+
+  const currentDate = new Date(dateStr + "T12:00:00");
+  const todayStr = toDateStr(new Date());
+
+  function navigateDate(offset: number) {
+    const current = new Date(dateStr + "T12:00:00");
+    const next = addDays(current, offset);
+    setDateStr(toDateStr(next));
+  }
+
+  function getDateLabel(ds: string): string {
+    const today = toDateStr(new Date());
+    const yesterday = toDateStr(subDays(new Date(), 1));
+    const tomorrow = toDateStr(addDays(new Date(), 1));
+    if (ds === today) return "Today";
+    if (ds === yesterday) return "Yesterday";
+    if (ds === tomorrow) return "Tomorrow";
+    return format(new Date(ds + "T12:00:00"), "MMM d");
+  }
 
   return (
     <div className="space-y-4">
@@ -69,23 +112,35 @@ export default function CleanerTasksPage() {
         {!online && <Badge variant="secondary">OFFLINE</Badge>}
       </div>
 
+      {/* Date navigation */}
       <div className="flex gap-2">
-        {[subDays(date, 1), date, addDays(date, 1)].map((d, i) => {
-          const label = i === 0 ? "Yesterday" : i === 1 ? "Today" : "Tomorrow";
-          const active = d.getTime() === date.getTime();
-          return (
-            <Button
-              key={label}
-              variant={active ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => setDate(d)}
-              aria-pressed={active}
-            >
-              {label}
-            </Button>
-          );
-        })}
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => navigateDate(-1)}
+        >
+          {getDateLabel(toDateStr(subDays(currentDate, 1)))}
+        </Button>
+        <Button
+          variant="default"
+          size="sm"
+          className="flex-[2]"
+          onClick={() => setDateStr(todayStr)}
+        >
+          {dateStr === todayStr ? "Today" : getDateLabel(dateStr)}
+          <span className="ml-1 text-xs opacity-70">
+            {format(currentDate, "MMM d")}
+          </span>
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1"
+          onClick={() => navigateDate(1)}
+        >
+          {getDateLabel(toDateStr(addDays(currentDate, 1)))}
+        </Button>
       </div>
 
       <div className="relative">
@@ -99,13 +154,25 @@ export default function CleanerTasksPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button variant={filter === "my" ? "default" : "outline"} size="sm" onClick={() => setFilter("my")}>
+        <Button
+          variant={filter === "my" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilter("my")}
+        >
           My tasks
         </Button>
-        <Button variant={filter === "all" ? "default" : "outline"} size="sm" onClick={() => setFilter("all")}>
+        <Button
+          variant={filter === "all" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilter("all")}
+        >
           All
         </Button>
-        <Button variant={filter === "status" ? "default" : "outline"} size="sm" onClick={() => setFilter("status")}>
+        <Button
+          variant={filter === "status" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFilter("status")}
+        >
           Status
         </Button>
         {filter === "status" && (
@@ -146,15 +213,24 @@ export default function CleanerTasksPage() {
 
 function TaskCard({ task }: { task: TaskWithApartment }) {
   const statusColor =
-    task.status === "DONE" ? "bg-emerald-100 text-emerald-700 border-emerald-200" :
-    task.status === "IN_PROGRESS" ? "bg-amber-100 text-amber-700 border-amber-200" :
-    "bg-red-100 text-red-700 border-red-200";
+    task.status === "DONE"
+      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+      : task.status === "IN_PROGRESS"
+        ? "bg-amber-100 text-amber-700 border-amber-200"
+        : "bg-red-100 text-red-700 border-red-200";
+
+  const typeLabel = getTaskTypeLabel(task.type, task.customTypeName);
 
   return (
     <Link href={`/tasks/${task.id}`}>
       <div className="rounded-2xl border bg-card p-4 shadow-sm hover:shadow-md transition-shadow">
         <div className="flex items-start justify-between mb-2">
-          <h2 className="text-3xl font-bold">{task.apartment.number}</h2>
+          <div>
+            <h2 className="text-lg font-bold">{task.title || typeLabel}</h2>
+            <p className="text-2xl font-bold text-muted-foreground">
+              {task.apartment.number}
+            </p>
+          </div>
           <Badge className={statusColor} variant="outline">
             {task.status.replace("_", " ")}
           </Badge>
@@ -174,21 +250,31 @@ function TaskCard({ task }: { task: TaskWithApartment }) {
 
         <div className="flex flex-wrap gap-2 mb-3">
           {task.requests?.toLowerCase().includes("luggage") && (
-            <span className="inline-flex items-center gap-1 text-xs"><Luggage className="size-3" /> Luggage</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              <Luggage className="size-3" /> Luggage
+            </span>
           )}
           {task.requests?.toLowerCase().includes("parking") && (
-            <span className="inline-flex items-center gap-1 text-xs"><Car className="size-3" /> Parking</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              <Car className="size-3" /> Parking
+            </span>
           )}
           {task.requests?.toLowerCase().includes("baby") && (
-            <span className="inline-flex items-center gap-1 text-xs"><Baby className="size-3" /> Baby</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              <Baby className="size-3" /> Baby
+            </span>
           )}
           {task.type === "REPAIR" && (
-            <span className="inline-flex items-center gap-1 text-xs"><Wrench className="size-3" /> Repair</span>
+            <span className="inline-flex items-center gap-1 text-xs">
+              <Wrench className="size-3" /> Repair
+            </span>
           )}
         </div>
 
         {task.instructions && (
-          <p className="text-sm text-muted-foreground line-clamp-1">{task.instructions}</p>
+          <p className="text-sm text-muted-foreground line-clamp-1">
+            {task.instructions}
+          </p>
         )}
       </div>
     </Link>

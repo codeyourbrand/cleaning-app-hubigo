@@ -48,8 +48,16 @@ export const apartmentSchema = z.object({
 
 export const taskCreateSchema = z.object({
   apartmentId: z.string().cuid(),
+  title: z.string().optional(),
   date: z.coerce.date(),
-  type: z.enum([TaskType.CLEANING, TaskType.REPAIR, TaskType.OTHER]),
+  type: z.enum([
+    TaskType.CHECK_OUT,
+    TaskType.REFRESH,
+    TaskType.CLEANING,
+    TaskType.REPAIR,
+    TaskType.OTHER,
+  ]),
+  customTypeName: z.string().optional(),
   checkoutTime: z.string().optional(),
   checkinWindow: z.string().optional(),
   guestsCount: z.coerce.number().int().min(0).optional(),
@@ -62,8 +70,18 @@ export const taskCreateSchema = z.object({
 
 export const taskUpdateSchema = z.object({
   apartmentId: z.string().cuid().optional(),
+  title: z.string().optional().nullable(),
   date: z.coerce.date().optional(),
-  type: z.enum([TaskType.CLEANING, TaskType.REPAIR, TaskType.OTHER]).optional(),
+  type: z
+    .enum([
+      TaskType.CHECK_OUT,
+      TaskType.REFRESH,
+      TaskType.CLEANING,
+      TaskType.REPAIR,
+      TaskType.OTHER,
+    ])
+    .optional(),
+  customTypeName: z.string().optional().nullable(),
   checkoutTime: z.string().optional().nullable(),
   checkinWindow: z.string().optional().nullable(),
   guestsCount: z.coerce.number().int().min(0).optional().nullable(),
@@ -71,7 +89,9 @@ export const taskUpdateSchema = z.object({
   requests: z.string().optional().nullable(),
   instructions: z.string().optional().nullable(),
   assignedToUserId: z.string().cuid().optional().nullable(),
-  status: z.enum([TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE]).optional(),
+  status: z
+    .enum([TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE])
+    .optional(),
 });
 
 export const taskStepUpdateSchema = z.object({

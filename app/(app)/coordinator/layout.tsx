@@ -14,6 +14,8 @@ import {
   Settings,
   LogOut,
   Menu,
+  Package,
+  ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -24,9 +26,10 @@ const links = [
   { href: "/coordinator", label: "Dashboard", icon: LayoutDashboard },
   { href: "/coordinator/tasks/new", label: "Create task", icon: ListTodo },
   { href: "/coordinator/apartments", label: "Apartments", icon: Building2 },
+  { href: "/coordinator/inventory", label: "Inventory", icon: Package },
   { href: "/coordinator/users", label: "Users", icon: Users },
   { href: "/coordinator/import", label: "Import", icon: Upload },
-  { href: "/coordinator/history", label: "History", icon: History },
+  { href: "/coordinator/history", label: "Logs", icon: ScrollText },
   {
     href: "/coordinator/settings/integrations",
     label: "Hostfully",

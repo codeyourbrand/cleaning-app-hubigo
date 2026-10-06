@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,9 @@ import {
   Baby,
   AlertTriangle,
   Search,
+  X,
+  Clock,
+  Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -49,8 +52,10 @@ type Comment = {
 };
 type Task = {
   id: string;
+  title: string | null;
   status: "TODO" | "IN_PROGRESS" | "DONE";
-  type: "CLEANING" | "REPAIR" | "OTHER";
+  type: "CHECK_OUT" | "REFRESH" | "CLEANING" | "REPAIR" | "OTHER";
+  customTypeName: string | null;
   date: string;
   checkoutTime: string | null;
   checkinWindow: string | null;
@@ -72,6 +77,23 @@ type Task = {
   comments: Comment[];
 };
 
+function getTaskTypeLabel(type: string, customTypeName?: string | null) {
+  switch (type) {
+    case "CHECK_OUT":
+      return "Check-out";
+    case "REFRESH":
+      return "Refresh";
+    case "CLEANING":
+      return "Cleaning";
+    case "REPAIR":
+      return "Repair";
+    case "OTHER":
+      return customTypeName || "Other";
+    default:
+      return type;
+  }
+}
+
 function TaskDetail({ taskId }: { taskId: string }) {
   const [task, setTask] = useState<Task | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,9 +101,9 @@ function TaskDetail({ taskId }: { taskId: string }) {
   const router = useRouter();
   const online = useOnlineStatus();
   const { queueMutation } = useMutationQueue();
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  async function loadTask() {
-    setLoading(true);
+  const loadTask = useCallback(async () => {
     try {
       const res = await fetch(`/api/tasks/${taskId}`);
       const data = await res.json();
@@ -91,11 +113,12 @@ function TaskDetail({ taskId }: { taskId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [taskId]);
 
   useEffect(() => {
+    setLoading(true);
     loadTask();
-  }, [taskId]);
+  }, [loadTask]);
 
   async function startTask() {
     setBusy(true);
@@ -134,6 +157,24 @@ function TaskDetail({ taskId }: { taskId: string }) {
   }
 
   async function toggleStep(stepId: string, done: boolean) {
+    if (!task) return;
+    // Optimistic update
+    setTask((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        steps: prev.steps.map((s) =>
+          s.id === stepId
+            ? {
+                ...s,
+                done,
+                doneAt: done ? new Date().toISOString() : undefined,
+              }
+            : s,
+        ),
+      };
+    });
+
     const res = online
       ? await fetch(`/api/tasks/${taskId}/steps/${stepId}`, {
           method: "PATCH",
@@ -145,14 +186,22 @@ function TaskDetail({ taskId }: { taskId: string }) {
           method: "PATCH",
           body: { done },
         });
-    if (res.ok) {
-      await loadTask();
-    } else {
+    if (!res.ok) {
+      // Revert on failure
+      setTask((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          steps: prev.steps.map((s) =>
+            s.id === stepId ? { ...s, done: !done, doneAt: undefined } : s,
+          ),
+        };
+      });
       toast.error("Could not update step");
     }
   }
 
-  async function addComment(body: string, parentId?: string) {
+  async function addComment(body: string, parentId?: string, files?: File[]) {
     const res = online
       ? await fetch(`/api/tasks/${taskId}/comments`, {
           method: "POST",
@@ -165,6 +214,18 @@ function TaskDetail({ taskId }: { taskId: string }) {
           body: { taskId, body, parentId },
         });
     if (res.ok) {
+      const data = await res.json();
+      // Upload comment photos
+      if (files && files.length > 0) {
+        for (const file of files) {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("taskId", taskId);
+          fd.append("commentId", data.comment.id);
+          fd.append("type", "COMMENT");
+          await fetch("/api/media", { method: "POST", body: fd });
+        }
+      }
       toast.success("Sent");
       await loadTask();
     } else {
@@ -172,19 +233,17 @@ function TaskDetail({ taskId }: { taskId: string }) {
     }
   }
 
-  async function uploadPhoto(type: "BEFORE" | "AFTER", file: File) {
+  async function uploadTaskPhoto(file: File) {
+    const form = new FormData();
+    form.append("file", file);
+    form.append("taskId", taskId);
+    form.append("type", "BEFORE");
     const res = online
-      ? await (() => {
-          const form = new FormData();
-          form.append("file", file);
-          form.append("taskId", taskId);
-          form.append("type", type);
-          return fetch("/api/media", { method: "POST", body: form });
-        })()
+      ? await fetch("/api/media", { method: "POST", body: form })
       : await queueMutation({
           url: "/api/media",
           method: "POST",
-          body: { taskId, type },
+          body: { taskId, type: "BEFORE" },
           file,
         });
     if (res.ok) {
@@ -206,12 +265,13 @@ function TaskDetail({ taskId }: { taskId: string }) {
         ? "bg-amber-100 text-amber-700 border-amber-200"
         : "bg-red-100 text-red-700 border-red-200";
 
-  const beforePhotos = task.media.filter((m) => m.type === "BEFORE");
-  const afterPhotos = task.media.filter((m) => m.type === "AFTER");
+  const allPhotos = task.media;
   const allStepsDone = task.steps.length > 0 && task.steps.every((s) => s.done);
+  const typeLabel = getTaskTypeLabel(task.type, task.customTypeName);
 
   return (
     <div className="pb-24">
+      {/* Header: task name + apartment number */}
       <div className="flex items-center gap-2 mb-4">
         <Button
           variant="ghost"
@@ -221,20 +281,102 @@ function TaskDetail({ taskId }: { taskId: string }) {
         >
           <ArrowLeft className="size-5" />
         </Button>
-        <Link href={`/apartments/${task.apartment.id}`}>
-          <h1 className="text-3xl font-bold">{task.apartment.number}</h1>
-        </Link>
-        <Badge className={statusBadge} variant="outline">
-          {task.status.replace("_", " ")}
-        </Badge>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold truncate">
+              {task.title || typeLabel}
+            </h1>
+            <Badge className={statusBadge} variant="outline">
+              {task.status.replace("_", " ")}
+            </Badge>
+          </div>
+          <Link
+            href={`/apartments/${task.apartment.id}`}
+            className="text-sm text-muted-foreground hover:underline"
+          >
+            {task.apartment.number}
+            {task.apartment.building ? ` · ${task.apartment.building}` : ""}
+            {task.apartment.floor ? ` · Floor ${task.apartment.floor}` : ""}
+          </Link>
+        </div>
       </div>
 
+      {/* Photos at top */}
+      <Section title="Photos">
+        <div className="grid grid-cols-3 gap-2">
+          {allPhotos.map((p) => (
+            <div
+              key={p.id}
+              className="aspect-square rounded-xl overflow-hidden bg-muted"
+            >
+              <img
+                src={p.url}
+                alt="Task photo"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => photoInputRef.current?.click()}
+            className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground hover:bg-muted"
+            aria-label="Add photo"
+          >
+            <Camera className="size-6 mb-1" />
+            <span className="text-xs">Add photo</span>
+          </button>
+        </div>
+        <input
+          ref={photoInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) uploadTaskPhoto(file);
+            e.target.value = "";
+          }}
+        />
+      </Section>
+
       <div className="space-y-1 text-sm text-muted-foreground mb-4">
-        <p>
-          {task.apartment.building || "—"} · Floor {task.apartment.floor || "—"}
-        </p>
-        <p>Type: {task.type}</p>
+        <p>Type: {typeLabel}</p>
+        {task.assignedTo && <p>Assigned to: {task.assignedTo.name}</p>}
       </div>
+
+      {/* Cleaning times */}
+      {(task.startedAt || task.doneAt) && (
+        <div className="flex gap-4 mb-4 p-3 rounded-xl bg-muted/50">
+          {task.startedAt && (
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="size-4 text-amber-600" />
+              <span>
+                Started:{" "}
+                {new Date(task.startedAt).toLocaleString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            </div>
+          )}
+          {task.doneAt && (
+            <div className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="size-4 text-emerald-600" />
+              <span>
+                Finished:{" "}
+                {new Date(task.doneAt).toLocaleString(undefined, {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  day: "numeric",
+                  month: "short",
+                })}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6">
         {task.status !== "DONE" && task.status !== "IN_PROGRESS" && (
@@ -281,9 +423,9 @@ function TaskDetail({ taskId }: { taskId: string }) {
               aria-pressed={step.done}
             >
               {step.done ? (
-                <CheckCircle2 className="size-6 text-emerald-600" />
+                <CheckCircle2 className="size-6 text-emerald-600 shrink-0" />
               ) : (
-                <Circle className="size-6 text-muted-foreground" />
+                <Circle className="size-6 text-muted-foreground shrink-0" />
               )}
               <div className="flex-1">
                 <p
@@ -309,22 +451,11 @@ function TaskDetail({ taskId }: { taskId: string }) {
         )}
       </Section>
 
-      <Section title="Before / After">
-        <PhotoGrid
-          photos={beforePhotos}
-          type="BEFORE"
-          onUpload={(f) => uploadPhoto("BEFORE", f)}
-        />
-        <PhotoGrid
-          photos={afterPhotos}
-          type="AFTER"
-          onUpload={(f) => uploadPhoto("AFTER", f)}
-        />
-      </Section>
-
       <Section title="Comments">
         <CommentTree comments={task.comments} onReply={addComment} />
-        <CommentForm onSubmit={(body) => addComment(body)} />
+        <CommentForm
+          onSubmit={(body, files) => addComment(body, undefined, files)}
+        />
       </Section>
 
       <div className="flex gap-2 mt-4">
@@ -383,63 +514,12 @@ function Detail({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-function PhotoGrid({
-  photos,
-  type,
-  onUpload,
-}: {
-  photos: { id: string; url: string }[];
-  type: "BEFORE" | "AFTER";
-  onUpload: (file: File) => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  return (
-    <div className="mb-4">
-      <h3 className="text-sm font-medium mb-2">{type}</h3>
-      <div className="grid grid-cols-3 gap-2">
-        {photos.map((p) => (
-          <div
-            key={p.id}
-            className="aspect-square rounded-xl overflow-hidden bg-muted"
-          >
-            <img
-              src={p.url}
-              alt={`${type} photo`}
-              className="w-full h-full object-cover"
-            />
-          </div>
-        ))}
-        <button
-          onClick={() => inputRef.current?.click()}
-          className="aspect-square rounded-xl border-2 border-dashed flex flex-col items-center justify-center text-muted-foreground hover:bg-muted"
-          aria-label={`Add ${type} photo`}
-        >
-          <Camera className="size-6 mb-1" />
-          <span className="text-xs">Add photo</span>
-        </button>
-      </div>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) onUpload(file);
-          e.target.value = "";
-        }}
-      />
-    </div>
-  );
-}
-
 function CommentTree({
   comments,
   onReply,
 }: {
   comments: Comment[];
-  onReply: (body: string, parentId: string) => void;
+  onReply: (body: string, parentId?: string, files?: File[]) => void;
 }) {
   const [replying, setReplying] = useState<string | null>(null);
 
@@ -481,8 +561,8 @@ function CommentTree({
           </button>
           {replying === c.id && (
             <CommentForm
-              onSubmit={(body) => {
-                onReply(body, c.id);
+              onSubmit={(body, files) => {
+                onReply(body, c.id, files);
                 setReplying(null);
               }}
               placeholder="Reply..."
@@ -502,6 +582,18 @@ function CommentTree({
                     </span>
                   </div>
                   <p className="text-sm">{r.body}</p>
+                  {r.media?.length > 0 && (
+                    <div className="flex gap-2 mt-1">
+                      {r.media.map((m) => (
+                        <img
+                          key={m.id}
+                          src={m.url}
+                          alt=""
+                          className="size-16 rounded-lg object-cover"
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -516,29 +608,96 @@ function CommentForm({
   onSubmit,
   placeholder = "Add comment",
 }: {
-  onSubmit: (body: string) => void;
+  onSubmit: (body: string, files?: File[]) => void;
   placeholder?: string;
 }) {
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(fileList: FileList | null) {
+    if (!fileList) return;
+    const newFiles = Array.from(fileList);
+    setFiles((prev) => [...prev, ...newFiles]);
+    newFiles.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreviews((prev) => [...prev, e.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function removeFile(index: number) {
+    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviews((prev) => prev.filter((_, i) => i !== index));
+  }
+
   return (
     <form
-      className="flex gap-2 mt-3"
+      className="mt-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!body.trim()) return;
-        onSubmit(body);
+        if (!body.trim() && files.length === 0) return;
+        onSubmit(body, files.length > 0 ? files : undefined);
         setBody("");
+        setFiles([]);
+        setPreviews([]);
       }}
     >
-      <Input
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder={placeholder}
-        className="flex-1"
+      {previews.length > 0 && (
+        <div className="flex gap-2 mb-2">
+          {previews.map((src, i) => (
+            <div key={i} className="relative size-16">
+              <img
+                src={src}
+                alt="Preview"
+                className="size-16 rounded-lg object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => removeFile(i)}
+                className="absolute -top-1 -right-1 size-5 rounded-full bg-black/60 text-white flex items-center justify-center"
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="flex gap-2">
+        <Input
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder={placeholder}
+          className="flex-1"
+        />
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => fileInputRef.current?.click()}
+          aria-label="Attach photo"
+        >
+          <ImageIcon className="size-4" />
+        </Button>
+        <Button type="submit" size="sm">
+          <MessageSquare className="size-4 mr-1" /> Send
+        </Button>
+      </div>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          addFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
-      <Button type="submit" size="sm">
-        <MessageSquare className="size-4 mr-1" /> Send
-      </Button>
     </form>
   );
 }

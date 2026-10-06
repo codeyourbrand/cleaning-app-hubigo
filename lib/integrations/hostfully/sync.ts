@@ -12,7 +12,7 @@ import {
 } from "./client";
 import { logAudit } from "@/lib/audit";
 import { Prisma, Role, TaskType, TaskStatus } from "@prisma/client";
-import { differenceInCalendarDays } from "date-fns";
+import { differenceInCalendarDays, addDays } from "date-fns";
 
 export const ACTIVE_STATUSES = new Set([
   "BOOKED",
@@ -69,6 +69,7 @@ export function mapLeadToTaskData(lead: HostfullyLead) {
 
   return {
     cleaningDate: checkOut?.date ?? null,
+    checkInDate: checkIn?.date ?? null,
     checkoutTime: checkOut?.time ?? null,
     checkinWindow: checkIn?.time ?? null,
     guestsCount:
@@ -287,7 +288,8 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
   const taskPayload = {
     apartmentId: apartment.id,
     date: mapped.cleaningDate,
-    type: TaskType.CLEANING,
+    type: TaskType.CHECK_OUT,
+    title: "Check-out",
     status: TaskStatus.TODO,
     checkoutTime: mapped.checkoutTime,
     checkinWindow: mapped.checkinWindow,
@@ -353,7 +355,93 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
       createdByUserId: ctx.coordinatorId,
     },
   });
-  return { reservation, task, created: true, cancelled: false, skipped: null };
+
+  // Auto-generate REFRESH tasks for long stays
+  const refreshTasks = await generateRefreshTasks(
+    lead,
+    apartment.id,
+    mapped,
+    ctx,
+  );
+
+  return {
+    reservation,
+    task,
+    created: true,
+    cancelled: false,
+    skipped: null,
+    refreshTasks,
+  };
+}
+
+/**
+ * Generate REFRESH tasks for mid-stay cleaning.
+ * Rules:
+ *   - Stays 4–12 nights: 1 refresh at the midpoint (once per stay)
+ *   - Stays 14+ nights: 1 refresh per week
+ */
+async function generateRefreshTasks(
+  lead: HostfullyLead,
+  apartmentId: string,
+  mapped: ReturnType<typeof mapLeadToTaskData>,
+  ctx: SyncContext,
+) {
+  const { checkInDate, cleaningDate: checkOutDate, nightsCount } = mapped;
+  if (!checkInDate || !checkOutDate || !nightsCount) return [];
+  if (nightsCount < 4) return [];
+
+  const refreshDates: Date[] = [];
+
+  if (nightsCount >= 4 && nightsCount <= 12) {
+    // 1 refresh at the midpoint
+    const midDay = Math.floor(nightsCount / 2);
+    refreshDates.push(addDays(checkInDate, midDay));
+  } else if (nightsCount >= 14) {
+    // 1 refresh per week
+    let day = 7;
+    while (day < nightsCount) {
+      refreshDates.push(addDays(checkInDate, day));
+      day += 7;
+    }
+  }
+
+  const todayUtc = new Date(
+    Date.UTC(
+      new Date().getUTCFullYear(),
+      new Date().getUTCMonth(),
+      new Date().getUTCDate(),
+    ),
+  );
+
+  const created: any[] = [];
+  for (const date of refreshDates) {
+    if (date < todayUtc) continue;
+
+    // Check if a refresh task already exists for this apartment + date
+    const existing = await prisma.task.findFirst({
+      where: {
+        apartmentId,
+        date,
+        type: TaskType.REFRESH,
+      },
+    });
+    if (existing) continue;
+
+    const refreshTask = await prisma.task.create({
+      data: {
+        apartmentId,
+        date,
+        type: TaskType.REFRESH,
+        title: "Refresh",
+        status: TaskStatus.TODO,
+        guestsCount: mapped.guestsCount,
+        nightsCount: mapped.nightsCount,
+        createdByUserId: ctx.coordinatorId,
+      },
+    });
+    created.push(refreshTask);
+  }
+  return created;
 }
 
 async function resolveCoordinatorId(): Promise<string> {

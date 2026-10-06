@@ -14,6 +14,8 @@ enum Role {
 }
 
 enum TaskType {
+  CHECK_OUT
+  REFRESH
   CLEANING
   REPAIR
   OTHER
@@ -55,6 +57,8 @@ model User {
   taskStepsDone   TaskStep[]    @relation("TaskStepDoneBy")
   notifications   Notification[]
   pushSubscriptions WebPushSubscription[]
+  inventoryChecklistsCreated InventoryChecklist[] @relation("InventoryChecklistCreatedBy")
+  inventoryItemsChecked      InventoryItem[]      @relation("InventoryItemCheckedBy")
 
   @@map("users")
 }
@@ -74,6 +78,7 @@ model Apartment {
   lostFounds  LostFound[]
   damages     Damage[]
   hostfullyReservations HostfullyReservation[]
+  inventoryChecklists   InventoryChecklist[]
 
   @@unique([number, building], name: "apartment_number_building_unique")
   @@index([number])
@@ -82,9 +87,11 @@ model Apartment {
 
 model Task {
   id                            String     @id @default(cuid())
+  title                         String?
   date                          DateTime   @db.Date
   apartmentId                   String     @map("apartment_id")
   type                          TaskType
+  customTypeName                String?    @map("custom_type_name")
   status                        TaskStatus @default(TODO)
   checkoutTime                  String?    @map("checkout_time")
   checkinWindow                 String?    @map("checkin_window")
@@ -276,4 +283,48 @@ model WebPushSubscription {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("web_push_subscriptions")
+}
+
+enum InventoryChecklistType {
+  APARTMENT
+  STORAGE
+}
+
+model InventoryChecklist {
+  id          String                 @id @default(cuid())
+  name        String
+  type        InventoryChecklistType
+  apartmentId String?                @map("apartment_id")
+  notes       String?
+  createdByUserId String             @map("created_by_user_id")
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  apartment Apartment?      @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  createdBy User            @relation("InventoryChecklistCreatedBy", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  items     InventoryItem[]
+
+  @@index([apartmentId])
+  @@index([type])
+  @@map("inventory_checklists")
+}
+
+model InventoryItem {
+  id          String   @id @default(cuid())
+  checklistId String   @map("checklist_id")
+  name        String
+  quantity    Int      @default(1)
+  checked     Boolean  @default(false)
+  checkedAt   DateTime? @map("checked_at")
+  checkedByUserId String? @map("checked_by_user_id")
+  order       Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  checklist InventoryChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  checkedBy User?              @relation("InventoryItemCheckedBy", fields: [checkedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([checklistId, order])
+  @@map("inventory_items")
 }
