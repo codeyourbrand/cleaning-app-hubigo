@@ -59,6 +59,7 @@ model User {
   pushSubscriptions WebPushSubscription[]
   inventoryChecklistsCreated InventoryChecklist[] @relation("InventoryChecklistCreatedBy")
   inventoryItemsChecked      InventoryItem[]      @relation("InventoryItemCheckedBy")
+  shifts                     CleanerShift[]
 
   @@map("users")
 }
@@ -337,4 +338,34 @@ model InventoryItem {
 
   @@index([checklistId, order])
   @@map("inventory_items")
+}
+
+model CleanerShift {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  date      DateTime @db.Date
+  startTime String?  @map("start_time")
+  endTime   String?  @map("end_time")
+  dayOff    Boolean  @default(false) @map("day_off")
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date], name: "cleaner_shift_user_date")
+  @@index([date])
+  @@map("cleaner_shifts")
+}
+
+model ScheduleNote {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  note      String
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([date])
+  @@map("schedule_notes")
 }

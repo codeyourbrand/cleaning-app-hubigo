@@ -17,6 +17,7 @@ import {
   Package,
   ScrollText,
   MessageSquare,
+  CalendarDays,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/coordinator", label: "Dashboard", icon: LayoutDashboard },
   { href: "/coordinator/tasks/new", label: "Create task", icon: ListTodo },
+  { href: "/coordinator/schedule", label: "Schedule", icon: CalendarDays },
   { href: "/coordinator/apartments", label: "Apartments", icon: Building2 },
   { href: "/coordinator/inventory", label: "Inventory", icon: Package },
   { href: "/coordinator/users", label: "Users", icon: Users },
