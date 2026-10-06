@@ -8,7 +8,6 @@ import {
   ListTodo,
   Building2,
   Users,
-  Upload,
   History,
   Plug,
   Settings,
@@ -31,7 +30,6 @@ const links = [
   { href: "/coordinator/apartments", label: "Apartments", icon: Building2 },
   { href: "/coordinator/inventory", label: "Inventory", icon: Package },
   { href: "/coordinator/users", label: "Users", icon: Users },
-  { href: "/coordinator/import", label: "Import", icon: Upload },
   { href: "/coordinator/history", label: "Logs", icon: ScrollText },
   {
     href: "/coordinator/notifications",

@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
@@ -90,7 +89,7 @@ function typeLabel(type: string, custom?: string | null) {
     case "REFRESH":
       return "REFRESH";
     case "CLEANING":
-      return "CLEANING";
+      return "VACANT CLEAN";
     case "REPAIR":
       return "REPAIR";
     case "OTHER":
@@ -105,13 +104,13 @@ function typeColor(type: string) {
     case "CHECK_OUT":
       return "text-black font-bold";
     case "REFRESH":
-      return "text-orange-600 font-bold";
+      return "text-blue-600 font-bold";
     case "CLEANING":
-      return "text-purple-600 font-bold";
+      return "text-fuchsia-600 font-bold";
     case "REPAIR":
       return "text-red-600 font-bold";
     default:
-      return "text-gray-700 font-bold";
+      return "text-amber-700 font-bold";
   }
 }
 
@@ -126,12 +125,12 @@ function fmtDate(d: Date) {
 }
 
 const cellClass =
-  "w-full h-8 rounded border border-transparent bg-transparent px-1.5 text-sm hover:border-input focus:border-ring focus:bg-background focus:outline-none";
+  "w-full h-8 appearance-none rounded border border-transparent bg-transparent px-1.5 text-center text-sm hover:border-input focus:border-ring focus:bg-white focus:outline-none";
 
 const TASK_TYPES = [
   { value: "CHECK_OUT", label: "CHECK OUT" },
   { value: "REFRESH", label: "REFRESH" },
-  { value: "CLEANING", label: "CLEANING" },
+  { value: "CLEANING", label: "VACANT CLEAN" },
   { value: "REPAIR", label: "REPAIR" },
   { value: "OTHER", label: "OTHER" },
 ];
@@ -156,7 +155,9 @@ function CellInput({
       value={v}
       onChange={(e) => setV(e.target.value)}
       onBlur={() => v !== value && onSave(v)}
-      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      onKeyDown={(e) =>
+        e.key === "Enter" && (e.target as HTMLInputElement).blur()
+      }
     />
   );
 }
@@ -407,10 +408,16 @@ function DailyView({
     activeShifts.length > 0
       ? activeShifts.map((s) => s.user.name).join(", ")
       : "No shifts set";
-  const shiftTimeRange =
-    activeShifts.length > 0
-      ? `${activeShifts[0]?.startTime ?? "?"} – ${activeShifts[0]?.endTime ?? "?"}`
-      : "";
+  const offNames = data.shifts
+    .filter((x) => x.dayOff)
+    .map((x) => x.user.name)
+    .join(", ");
+  const dayLabel =
+    fmtDate(date) === fmtDate(new Date())
+      ? "TODAY"
+      : fmtDate(date) === fmtDate(addDays(new Date(), 1))
+        ? "TOMORROW"
+        : format(date, "EEEE").toUpperCase();
 
   return (
     <div className="space-y-4">
@@ -426,14 +433,6 @@ function DailyView({
         <div className="text-center">
           <div className="text-lg font-bold">
             {format(date, "EEEE, dd/MM/yyyy")}
-          </div>
-          <div className="text-sm text-muted-foreground">
-            FOR{" "}
-            {fmtDate(date) === fmtDate(new Date())
-              ? "TODAY"
-              : fmtDate(date) === fmtDate(addDays(new Date(), 1))
-                ? "TOMORROW"
-                : format(date, "EEEE").toUpperCase()}
           </div>
         </div>
         <Button
@@ -455,14 +454,48 @@ function DailyView({
 
       {/* Shift header section */}
       <div className="rounded-xl border bg-card">
-        <div className="border-b px-4 py-3 flex items-center justify-between">
-          <div>
-            <div className="text-sm font-semibold">Team on duty</div>
-            <div className="text-xs text-muted-foreground">
-              {shiftSummary}
-              {shiftTimeRange && ` · ${shiftTimeRange}`}
-            </div>
-          </div>
+        <div className="flex items-start justify-between gap-4 p-3">
+          <table className="w-[420px] max-w-full border-collapse border border-black bg-white text-sm text-black">
+            <tbody>
+              <tr>
+                <td
+                  colSpan={3}
+                  className="border border-black py-1 text-center font-bold text-blue-700"
+                >
+                  FOR {dayLabel}
+                </td>
+              </tr>
+              <tr>
+                <td className="border border-black" />
+                <td
+                  colSpan={2}
+                  className="border border-black py-1 text-center font-bold"
+                >
+                  OFF{offNames && `: ${offNames}`}
+                </td>
+              </tr>
+              <tr className="font-bold">
+                <td className="border border-black" />
+                <td className="border border-black py-1 text-center">
+                  Shift start
+                </td>
+                <td className="border border-black py-1 text-center">
+                  Shift end
+                </td>
+              </tr>
+              <tr className="font-bold">
+                <td className="border border-black px-2 py-3 text-center">
+                  {shiftSummary}
+                </td>
+                <td className="border border-black text-center">
+                  {activeShifts[0]?.startTime ?? "-"}
+                </td>
+                <td className="border border-black text-center">
+                  {activeShifts[0]?.endTime ?? "-"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
           <Button
             variant="outline"
             size="sm"
@@ -539,26 +572,6 @@ function DailyView({
         )}
       </div>
 
-      {/* Notes (breaks etc.) */}
-      {data.notes.length > 0 && (
-        <div className="space-y-1">
-          {data.notes.map((n) => (
-            <div
-              key={n.id}
-              className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-4 py-2 text-sm font-semibold text-amber-800"
-            >
-              <span className="flex-1">{n.note}</span>
-              <button
-                onClick={() => deleteNote(n.id)}
-                className="text-amber-500 hover:text-amber-700"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Add note */}
       <div className="flex gap-2">
         <Input
@@ -579,43 +592,49 @@ function DailyView({
       </div>
 
       {/* Daily task table — editable, Excel-style */}
-      <div className="rounded-xl border overflow-x-auto">
-        <table className="min-w-[1300px] w-full text-sm">
+      <div className="overflow-x-auto">
+        <table className="min-w-[1300px] w-full border-collapse border border-black bg-white text-sm text-black">
           <thead>
-            <tr className="bg-muted/60 border-b">
-              <th className="px-2 py-2 text-left font-semibold w-24">Time</th>
-              <th className="px-2 py-2 text-left font-semibold w-40">
+            <tr>
+              <th className="border border-black px-2 py-1 text-center font-bold w-24">
+                Time
+              </th>
+              <th className="border border-black px-2 py-1 text-center font-bold w-40">
                 Assigned
               </th>
-              <th className="px-2 py-2 text-left font-semibold w-32">
+              <th className="border border-black px-2 py-1 text-center font-bold w-32">
                 Apartment
               </th>
-              <th className="px-2 py-2 text-left font-semibold w-32">Type</th>
-              <th className="px-2 py-2 text-center font-semibold w-14">
+              <th className="border border-black px-2 py-1 text-center font-bold w-32">
+                Type
+              </th>
+              <th className="border border-black px-2 py-1 text-center font-bold w-14">
                 Done?
               </th>
-              <th className="px-2 py-2 text-left font-semibold w-24">
+              <th className="border border-black px-2 py-1 text-center font-bold w-24">
                 Check in
               </th>
-              <th className="px-2 py-2 text-center font-semibold w-16">
+              <th className="border border-black px-2 py-1 text-center font-bold w-16">
                 Guests
               </th>
-              <th className="px-2 py-2 text-center font-semibold w-16">
+              <th className="border border-black px-2 py-1 text-center font-bold w-16">
                 Nights
               </th>
-              <th className="px-2 py-2 text-left font-semibold">Request</th>
-              <th className="px-2 py-2 text-left font-semibold">
+              <th className="border border-black px-2 py-1 text-center font-bold">
+                Request
+              </th>
+              <th className="border border-black px-2 py-1 text-center font-bold">
                 Instructions
               </th>
               <th className="w-10" />
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody>
             {data.tasks.length === 0 && (
               <tr>
                 <td
                   colSpan={11}
-                  className="px-3 py-8 text-center text-muted-foreground"
+                  className="border border-black px-3 py-8 text-center text-muted-foreground"
                 >
                   No tasks scheduled for this day.
                 </td>
@@ -624,18 +643,18 @@ function DailyView({
             {data.tasks.map((t) => (
               <tr
                 key={t.id}
-                className={`hover:bg-muted/30 transition-colors ${
-                  t.status === "DONE" ? "bg-emerald-50/50" : ""
+                className={`hover:bg-slate-50 ${
+                  t.status === "DONE" ? "bg-emerald-50" : ""
                 }`}
               >
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     type="time"
                     value={t.checkoutTime ?? ""}
                     onSave={(v) => patchTask(t.id, { checkoutTime: v || null })}
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <select
                     className={cellClass}
                     value={t.assignedTo?.id ?? ""}
@@ -653,7 +672,7 @@ function DailyView({
                     ))}
                   </select>
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <select
                     className={`${cellClass} font-bold`}
                     value={t.apartment.id}
@@ -662,7 +681,9 @@ function DailyView({
                     }
                   >
                     {!apartments.some((a) => a.id === t.apartment.id) && (
-                      <option value={t.apartment.id}>{t.apartment.number}</option>
+                      <option value={t.apartment.id}>
+                        {t.apartment.number}
+                      </option>
                     )}
                     {apartments.map((a) => (
                       <option key={a.id} value={a.id}>
@@ -671,7 +692,7 @@ function DailyView({
                     ))}
                   </select>
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <select
                     className={`${cellClass} ${typeColor(t.type)}`}
                     value={t.type}
@@ -684,7 +705,7 @@ function DailyView({
                     ))}
                   </select>
                 </td>
-                <td className="px-2 py-1 text-center">
+                <td className="border border-black px-2 py-1 text-center">
                   <input
                     type="checkbox"
                     className="size-4 cursor-pointer"
@@ -696,40 +717,46 @@ function DailyView({
                     }
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     type="time"
                     value={t.checkinWindow ?? ""}
-                    onSave={(v) => patchTask(t.id, { checkinWindow: v || null })}
+                    onSave={(v) =>
+                      patchTask(t.id, { checkinWindow: v || null })
+                    }
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     type="number"
                     className="text-center"
                     value={t.guestsCount?.toString() ?? ""}
                     onSave={(v) =>
-                      patchTask(t.id, { guestsCount: v === "" ? null : Number(v) })
+                      patchTask(t.id, {
+                        guestsCount: v === "" ? null : Number(v),
+                      })
                     }
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     type="number"
                     className="text-center"
                     value={t.nightsCount?.toString() ?? ""}
                     onSave={(v) =>
-                      patchTask(t.id, { nightsCount: v === "" ? null : Number(v) })
+                      patchTask(t.id, {
+                        nightsCount: v === "" ? null : Number(v),
+                      })
                     }
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     value={t.requests ?? ""}
                     onSave={(v) => patchTask(t.id, { requests: v || null })}
                   />
                 </td>
-                <td className="px-1 py-1">
+                <td className="border border-black px-1 py-1">
                   <CellInput
                     value={t.instructions ?? ""}
                     onSave={(v) => patchTask(t.id, { instructions: v || null })}
@@ -746,8 +773,27 @@ function DailyView({
                 </td>
               </tr>
             ))}
-            <tr className="bg-muted/30">
-              <td className="px-1 py-2">
+            {data.notes.map((n) => (
+              <tr key={n.id}>
+                <td
+                  colSpan={10}
+                  className="border border-black py-2 text-center font-bold"
+                >
+                  {n.note}
+                </td>
+                <td className="px-1 text-center">
+                  <button
+                    onClick={() => deleteNote(n.id)}
+                    className="text-muted-foreground hover:text-red-600"
+                    aria-label="Delete note"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50">
+              <td className="border border-black px-1 py-2">
                 <input
                   type="time"
                   className={cellClass}
@@ -757,7 +803,7 @@ function DailyView({
                   }
                 />
               </td>
-              <td className="px-1 py-2">
+              <td className="border border-black px-1 py-2">
                 <select
                   className={cellClass}
                   value={newTask.assignedToUserId}
@@ -773,7 +819,7 @@ function DailyView({
                   ))}
                 </select>
               </td>
-              <td className="px-1 py-2">
+              <td className="border border-black px-1 py-2">
                 <select
                   className={cellClass}
                   value={newTask.apartmentId}
@@ -789,7 +835,7 @@ function DailyView({
                   ))}
                 </select>
               </td>
-              <td className="px-1 py-2">
+              <td className="border border-black px-1 py-2">
                 <select
                   className={cellClass}
                   value={newTask.type}
@@ -924,7 +970,7 @@ function WeeklyView({
   }
 
   const weekEnd = addDays(weekStart, 6);
-  const title = `Schedule ${format(weekStart, "dd/MM")} – ${format(weekEnd, "dd/MM/yyyy")}`;
+  const title = `Schedule Housekeeping ${format(weekStart, "dd/MM")} – ${format(weekEnd, "dd/MM/yyyy")}`;
 
   return (
     <div className="space-y-4">
@@ -937,7 +983,6 @@ function WeeklyView({
         >
           <ChevronLeft className="size-4" />
         </Button>
-        <div className="text-lg font-bold">{title}</div>
         <Button
           variant="outline"
           size="icon"
@@ -965,28 +1010,47 @@ function WeeklyView({
       </div>
 
       {/* Weekly shift table */}
-      <div className="rounded-xl border overflow-x-auto">
-        <table className="min-w-[900px] w-full text-sm">
+      <div className="overflow-x-auto bg-white font-serif text-black">
+        <div className="mb-3 border border-black py-1 text-center text-2xl font-bold">
+          {title}
+        </div>
+        <table className="min-w-[900px] w-full border-collapse border border-black text-sm">
           <thead>
-            <tr className="bg-muted/60 border-b">
-              <th className="px-3 py-2 text-left font-semibold w-32" />
+            <tr>
+              <th className="w-28" rowSpan={2} />
+              <th className="w-28" rowSpan={2} />
               {data.days.map((d) => (
                 <th
                   key={d.date}
-                  className="px-3 py-2 text-center font-semibold"
+                  className="border border-black px-3 py-1 text-center font-normal"
                 >
-                  <div>{format(parseISO(d.date), "dd/MM")}</div>
-                  <div className="text-xs text-muted-foreground font-normal">
-                    {d.dayOfWeek}
-                  </div>
+                  {format(parseISO(d.date), "dd/MM")}
+                </th>
+              ))}
+            </tr>
+            <tr>
+              {data.days.map((d) => (
+                <th
+                  key={d.date}
+                  className="border border-black px-3 py-1 text-center font-normal"
+                >
+                  {d.dayOfWeek}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y">
-            {data.cleaners.map((c) => (
-              <tr key={c.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-3 py-2 font-semibold whitespace-nowrap">
+          <tbody>
+            {data.cleaners.map((c, idx) => (
+              <tr key={c.id}>
+                {idx === 0 && (
+                  <td
+                    rowSpan={data.cleaners.length}
+                    className="border border-black px-2 text-center"
+                  >
+                    Housekeeping
+                  </td>
+                )}
+                <td className="border border-black px-3 py-1 text-center whitespace-nowrap">
                   {c.name}
                 </td>
                 {data.days.map((day) => {
@@ -995,7 +1059,10 @@ function WeeklyView({
 
                   if (editingShifts && inp) {
                     return (
-                      <td key={day.date} className="px-1 py-1">
+                      <td
+                        key={day.date}
+                        className="border border-black px-1 py-1"
+                      >
                         <div className="flex flex-col gap-1 items-center">
                           {inp.dayOff ? (
                             <span className="text-xs text-red-600 font-bold">
@@ -1062,21 +1129,20 @@ function WeeklyView({
                     return (
                       <td
                         key={day.date}
-                        className="px-3 py-2 text-center bg-red-50"
+                        className="border border-black bg-yellow-300 px-3 py-1 text-center"
                       >
-                        <span className="text-red-600 font-bold text-xs">
-                          Weekly Off
-                        </span>
+                        Weekly Off
                       </td>
                     );
                   }
 
                   if (shift?.startTime) {
                     return (
-                      <td key={day.date} className="px-3 py-2 text-center">
-                        <span className="font-mono text-xs">
-                          {shift.startTime}–{shift.endTime}
-                        </span>
+                      <td
+                        key={day.date}
+                        className="border border-black px-3 py-1 text-center"
+                      >
+                        {shift.startTime}-{shift.endTime}
                       </td>
                     );
                   }
@@ -1084,9 +1150,9 @@ function WeeklyView({
                   return (
                     <td
                       key={day.date}
-                      className="px-3 py-2 text-center text-muted-foreground"
+                      className="border border-black px-3 py-1 text-center"
                     >
-                      —
+                      -
                     </td>
                   );
                 })}
@@ -1106,80 +1172,60 @@ function WeeklyView({
       </div>
 
       {/* Daily task summaries per day */}
-      <div className="rounded-xl border overflow-x-auto">
-        <table className="min-w-[900px] w-full text-sm">
-          <thead>
-            <tr className="bg-muted/60 border-b">
-              <th className="px-3 py-2 text-left font-semibold w-32">Date</th>
-              <th className="px-3 py-2 text-left font-semibold">Tasks</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {data.days.map((day) => (
-              <tr
-                key={day.date}
-                className="hover:bg-muted/30 transition-colors align-top"
-              >
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="font-semibold">
+      <div className="overflow-x-auto bg-white font-serif text-black">
+        <table className="min-w-[900px] w-full border-collapse border border-black text-sm">
+          <tbody>
+            {data.days.map((day) => {
+              const outs = day.tasks.filter((x) => x.type === "CHECK_OUT");
+              const others = day.tasks.filter((x) =>
+                ["CLEANING", "REPAIR", "OTHER"].includes(x.type),
+              );
+              const refreshes = day.tasks.filter((x) => x.type === "REFRESH");
+              const parts = [
+                ...outs.map((x) => ({
+                  key: x.id,
+                  cls: "text-black",
+                  text: `${x.apartment.number} out`,
+                })),
+                ...others.map((x) => ({
+                  key: x.id,
+                  cls: "text-red-700",
+                  text: `${x.apartment.number} ${x.title || typeLabel(x.type, x.customTypeName)}`,
+                })),
+                ...(refreshes.length > 0
+                  ? [
+                      {
+                        key: "refresh",
+                        cls: "text-blue-700",
+                        text: `Refresh ${refreshes.map((x) => x.apartment.number).join(", ")}`,
+                      },
+                    ]
+                  : []),
+                ...day.notes.map((n) => ({
+                  key: n.id,
+                  cls: "text-red-700",
+                  text: n.note,
+                })),
+              ];
+              return (
+                <tr key={day.date}>
+                  <td className="w-28 border border-black px-3 py-1 text-center">
                     {format(parseISO(day.date), "dd/MM")}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
+                  </td>
+                  <td className="w-28 border border-black px-3 py-1 text-center">
                     {day.dayOfWeek}
-                  </div>
-                </td>
-                <td className="px-3 py-2">
-                  {day.tasks.length === 0 ? (
-                    <span className="text-muted-foreground text-xs">
-                      No tasks
-                    </span>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {day.tasks.map((t) => {
-                        const label = typeLabel(t.type, t.customTypeName);
-                        const isRefresh = t.type === "REFRESH";
-                        const isDone = t.status === "DONE";
-                        return (
-                          <span
-                            key={t.id}
-                            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium border ${
-                              isDone
-                                ? "bg-emerald-50 border-emerald-200 text-emerald-700 line-through"
-                                : isRefresh
-                                  ? "bg-amber-50 border-amber-200 text-amber-800"
-                                  : "bg-blue-50 border-blue-200 text-blue-800"
-                            }`}
-                          >
-                            {t.apartment.number}{" "}
-                            <span className="opacity-70">
-                              {label.toLowerCase()}
-                            </span>
-                            {t.assignedTo && (
-                              <span className="opacity-50">
-                                · {t.assignedTo.name}
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {day.notes.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {day.notes.map((n) => (
-                        <Badge
-                          key={n.id}
-                          variant="outline"
-                          className="bg-amber-50 border-amber-200 text-amber-800 text-xs"
-                        >
-                          {n.note}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="border border-black px-3 py-1 text-center">
+                    {parts.map((part, i) => (
+                      <span key={part.key} className={part.cls}>
+                        {i > 0 && <span className="text-black">, </span>}
+                        {part.text}
+                      </span>
+                    ))}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
