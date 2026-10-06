@@ -1,13 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import {
-  format,
-  addDays,
-  subDays,
-  startOfWeek,
-  parseISO,
-} from "date-fns";
+import { format, addDays, subDays, startOfWeek, parseISO } from "date-fns";
 import {
   ChevronLeft,
   ChevronRight,
@@ -131,6 +125,42 @@ function fmtDate(d: Date) {
   return format(d, "yyyy-MM-dd");
 }
 
+const cellClass =
+  "w-full h-8 rounded border border-transparent bg-transparent px-1.5 text-sm hover:border-input focus:border-ring focus:bg-background focus:outline-none";
+
+const TASK_TYPES = [
+  { value: "CHECK_OUT", label: "CHECK OUT" },
+  { value: "REFRESH", label: "REFRESH" },
+  { value: "CLEANING", label: "CLEANING" },
+  { value: "REPAIR", label: "REPAIR" },
+  { value: "OTHER", label: "OTHER" },
+];
+
+function CellInput({
+  value,
+  onSave,
+  type = "text",
+  className = "",
+}: {
+  value: string;
+  onSave: (v: string) => void;
+  type?: string;
+  className?: string;
+}) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  return (
+    <input
+      type={type}
+      className={`${cellClass} ${className}`}
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => v !== value && onSave(v)}
+      onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -198,37 +228,111 @@ function DailyView({
   const [savingShifts, setSavingShifts] = useState(false);
   const [noteInput, setNoteInput] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [apartments, setApartments] = useState<
+    { id: string; number: string; building: string | null }[]
+  >([]);
+  const [newTask, setNewTask] = useState({
+    apartmentId: "",
+    type: "CHECK_OUT",
+    time: "",
+    assignedToUserId: "",
+  });
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const dateStr = fmtDate(date);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/schedule?date=${dateStr}`);
-      if (!res.ok) throw new Error();
-      const d: DailyData = await res.json();
-      setData(d);
-      // Init shift inputs
-      const inputs: typeof shiftInputs = {};
-      for (const c of d.cleaners) {
-        const existing = d.shifts.find((s) => s.userId === c.id);
-        inputs[c.id] = {
-          start: existing?.startTime ?? "",
-          end: existing?.endTime ?? "",
-          dayOff: existing?.dayOff ?? false,
-        };
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res = await fetch(`/api/schedule?date=${dateStr}`);
+        if (!res.ok) throw new Error();
+        const d: DailyData = await res.json();
+        setData(d);
+        if (silent) return;
+        // Init shift inputs
+        const inputs: typeof shiftInputs = {};
+        for (const c of d.cleaners) {
+          const existing = d.shifts.find((s) => s.userId === c.id);
+          inputs[c.id] = {
+            start: existing?.startTime ?? "",
+            end: existing?.endTime ?? "",
+            dayOff: existing?.dayOff ?? false,
+          };
+        }
+        setShiftInputs(inputs);
+      } catch {
+        toast.error("Failed to load schedule");
+      } finally {
+        setLoading(false);
       }
-      setShiftInputs(inputs);
-    } catch {
-      toast.error("Failed to load schedule");
-    } finally {
-      setLoading(false);
-    }
-  }, [dateStr]);
+    },
+    [dateStr],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    fetch("/api/apartments")
+      .then((r) => r.json())
+      .then((d) => setApartments(d.apartments ?? []))
+      .catch(() => toast.error("Failed to load apartments"));
+  }, []);
+
+  async function patchTask(id: string, patch: Record<string, unknown>) {
+    setData((prev) =>
+      prev
+        ? {
+            ...prev,
+            tasks: prev.tasks.map((t) =>
+              t.id === id ? ({ ...t, ...patch } as TaskRow) : t,
+            ),
+          }
+        : prev,
+    );
+    const res = await fetch(`/api/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    });
+    if (!res.ok) toast.error("Failed to save");
+    if ("assignedToUserId" in patch || "apartmentId" in patch || !res.ok)
+      load(true);
+  }
+
+  async function removeTask(id: string) {
+    if (!confirm("Delete this task?")) return;
+    const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+    if (!res.ok) return toast.error("Failed to delete task");
+    load(true);
+  }
+
+  async function createTask() {
+    if (!newTask.apartmentId) return toast.error("Select an apartment");
+    setCreatingTask(true);
+    try {
+      const res = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apartmentId: newTask.apartmentId,
+          date: dateStr,
+          type: newTask.type,
+          checkoutTime: newTask.time || undefined,
+          assignedToUserId: newTask.assignedToUserId || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setNewTask({ ...newTask, apartmentId: "", time: "" });
+      load(true);
+    } catch {
+      toast.error("Failed to create task");
+    } finally {
+      setCreatingTask(false);
+    }
+  }
 
   async function saveShifts() {
     setSavingShifts(true);
@@ -299,12 +403,14 @@ function DailyView({
 
   // Group cleaners who have shifts today
   const activeShifts = data.shifts.filter((s) => !s.dayOff);
-  const shiftSummary = activeShifts.length > 0
-    ? activeShifts.map((s) => s.user.name).join(", ")
-    : "No shifts set";
-  const shiftTimeRange = activeShifts.length > 0
-    ? `${activeShifts[0]?.startTime ?? "?"} – ${activeShifts[0]?.endTime ?? "?"}`
-    : "";
+  const shiftSummary =
+    activeShifts.length > 0
+      ? activeShifts.map((s) => s.user.name).join(", ")
+      : "No shifts set";
+  const shiftTimeRange =
+    activeShifts.length > 0
+      ? `${activeShifts[0]?.startTime ?? "?"} – ${activeShifts[0]?.endTime ?? "?"}`
+      : "";
 
   return (
     <div className="space-y-4">
@@ -423,7 +529,9 @@ function DailyView({
             })}
             <div className="pt-2">
               <Button size="sm" onClick={saveShifts} disabled={savingShifts}>
-                {savingShifts && <Loader2 className="size-4 mr-1 animate-spin" />}
+                {savingShifts && (
+                  <Loader2 className="size-4 mr-1 animate-spin" />
+                )}
                 Save shifts
               </Button>
             </div>
@@ -470,36 +578,36 @@ function DailyView({
         </Button>
       </div>
 
-      {/* Daily task table — matches Excel layout */}
+      {/* Daily task table — editable, Excel-style */}
       <div className="rounded-xl border overflow-x-auto">
-        <table className="min-w-[1100px] w-full text-sm">
+        <table className="min-w-[1300px] w-full text-sm">
           <thead>
             <tr className="bg-muted/60 border-b">
-              <th className="px-3 py-2 text-left font-semibold w-16">Time</th>
-              <th className="px-3 py-2 text-left font-semibold">Assigned</th>
-              <th className="px-3 py-2 text-left font-semibold w-28">
+              <th className="px-2 py-2 text-left font-semibold w-24">Time</th>
+              <th className="px-2 py-2 text-left font-semibold w-40">
+                Assigned
+              </th>
+              <th className="px-2 py-2 text-left font-semibold w-32">
                 Apartment
               </th>
-              <th className="px-3 py-2 text-left font-semibold w-32">Status</th>
-              <th className="px-3 py-2 text-left font-semibold w-24">
-                Checkout
-              </th>
-              <th className="px-3 py-2 text-center font-semibold w-16">
+              <th className="px-2 py-2 text-left font-semibold w-32">Type</th>
+              <th className="px-2 py-2 text-center font-semibold w-14">
                 Done?
               </th>
-              <th className="px-3 py-2 text-left font-semibold w-28">
+              <th className="px-2 py-2 text-left font-semibold w-24">
                 Check in
               </th>
-              <th className="px-3 py-2 text-center font-semibold w-16">
+              <th className="px-2 py-2 text-center font-semibold w-16">
                 Guests
               </th>
-              <th className="px-3 py-2 text-center font-semibold w-16">
+              <th className="px-2 py-2 text-center font-semibold w-16">
                 Nights
               </th>
-              <th className="px-3 py-2 text-left font-semibold">Request</th>
-              <th className="px-3 py-2 text-left font-semibold">
+              <th className="px-2 py-2 text-left font-semibold">Request</th>
+              <th className="px-2 py-2 text-left font-semibold">
                 Instructions
               </th>
+              <th className="w-10" />
             </tr>
           </thead>
           <tbody className="divide-y">
@@ -517,50 +625,200 @@ function DailyView({
               <tr
                 key={t.id}
                 className={`hover:bg-muted/30 transition-colors ${
-                  t.status === "DONE" ? "opacity-60" : ""
+                  t.status === "DONE" ? "bg-emerald-50/50" : ""
                 }`}
               >
-                <td className="px-3 py-2 font-mono text-xs whitespace-nowrap">
-                  {t.checkoutTime ?? "—"}
+                <td className="px-1 py-1">
+                  <CellInput
+                    type="time"
+                    value={t.checkoutTime ?? ""}
+                    onSave={(v) => patchTask(t.id, { checkoutTime: v || null })}
+                  />
                 </td>
-                <td className="px-3 py-2">
-                  {t.assignedTo ? (
-                    <span className="font-medium">{t.assignedTo.name}</span>
-                  ) : (
-                    <span className="text-muted-foreground italic">
-                      Unassigned
-                    </span>
-                  )}
+                <td className="px-1 py-1">
+                  <select
+                    className={cellClass}
+                    value={t.assignedTo?.id ?? ""}
+                    onChange={(e) =>
+                      patchTask(t.id, {
+                        assignedToUserId: e.target.value || null,
+                      })
+                    }
+                  >
+                    <option value="">Unassigned</option>
+                    {data.cleaners.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </td>
-                <td className="px-3 py-2 font-bold">
-                  {t.apartment.number}
+                <td className="px-1 py-1">
+                  <select
+                    className={`${cellClass} font-bold`}
+                    value={t.apartment.id}
+                    onChange={(e) =>
+                      patchTask(t.id, { apartmentId: e.target.value })
+                    }
+                  >
+                    {!apartments.some((a) => a.id === t.apartment.id) && (
+                      <option value={t.apartment.id}>{t.apartment.number}</option>
+                    )}
+                    {apartments.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.number}
+                      </option>
+                    ))}
+                  </select>
                 </td>
-                <td className={`px-3 py-2 ${typeColor(t.type)}`}>
-                  {typeLabel(t.type, t.customTypeName)}
+                <td className="px-1 py-1">
+                  <select
+                    className={`${cellClass} ${typeColor(t.type)}`}
+                    value={t.type}
+                    onChange={(e) => patchTask(t.id, { type: e.target.value })}
+                  >
+                    {TASK_TYPES.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
                 </td>
-                <td className="px-3 py-2 font-mono text-xs">
-                  {t.checkoutTime ?? ""}
+                <td className="px-2 py-1 text-center">
+                  <input
+                    type="checkbox"
+                    className="size-4 cursor-pointer"
+                    checked={t.status === "DONE"}
+                    onChange={(e) =>
+                      patchTask(t.id, {
+                        status: e.target.checked ? "DONE" : "TODO",
+                      })
+                    }
+                  />
                 </td>
-                <td className="px-3 py-2 text-center text-lg">
-                  {statusIcon(t.status)}
+                <td className="px-1 py-1">
+                  <CellInput
+                    type="time"
+                    value={t.checkinWindow ?? ""}
+                    onSave={(v) => patchTask(t.id, { checkinWindow: v || null })}
+                  />
                 </td>
-                <td className="px-3 py-2 text-xs">
-                  {t.checkinWindow ?? ""}
+                <td className="px-1 py-1">
+                  <CellInput
+                    type="number"
+                    className="text-center"
+                    value={t.guestsCount?.toString() ?? ""}
+                    onSave={(v) =>
+                      patchTask(t.id, { guestsCount: v === "" ? null : Number(v) })
+                    }
+                  />
                 </td>
-                <td className="px-3 py-2 text-center">
-                  {t.guestsCount ?? ""}
+                <td className="px-1 py-1">
+                  <CellInput
+                    type="number"
+                    className="text-center"
+                    value={t.nightsCount?.toString() ?? ""}
+                    onSave={(v) =>
+                      patchTask(t.id, { nightsCount: v === "" ? null : Number(v) })
+                    }
+                  />
                 </td>
-                <td className="px-3 py-2 text-center">
-                  {t.nightsCount ?? ""}
+                <td className="px-1 py-1">
+                  <CellInput
+                    value={t.requests ?? ""}
+                    onSave={(v) => patchTask(t.id, { requests: v || null })}
+                  />
                 </td>
-                <td className="px-3 py-2 text-xs max-w-[160px] truncate">
-                  {t.requests ?? ""}
+                <td className="px-1 py-1">
+                  <CellInput
+                    value={t.instructions ?? ""}
+                    onSave={(v) => patchTask(t.id, { instructions: v || null })}
+                  />
                 </td>
-                <td className="px-3 py-2 text-xs max-w-[160px] truncate">
-                  {t.instructions ?? ""}
+                <td className="px-1 py-1 text-center">
+                  <button
+                    onClick={() => removeTask(t.id)}
+                    className="text-muted-foreground hover:text-red-600"
+                    aria-label="Delete task"
+                  >
+                    <X className="size-4" />
+                  </button>
                 </td>
               </tr>
             ))}
+            <tr className="bg-muted/30">
+              <td className="px-1 py-2">
+                <input
+                  type="time"
+                  className={cellClass}
+                  value={newTask.time}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, time: e.target.value })
+                  }
+                />
+              </td>
+              <td className="px-1 py-2">
+                <select
+                  className={cellClass}
+                  value={newTask.assignedToUserId}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, assignedToUserId: e.target.value })
+                  }
+                >
+                  <option value="">Unassigned</option>
+                  {data.cleaners.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-1 py-2">
+                <select
+                  className={cellClass}
+                  value={newTask.apartmentId}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, apartmentId: e.target.value })
+                  }
+                >
+                  <option value="">Apartment…</option>
+                  {apartments.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.number}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-1 py-2">
+                <select
+                  className={cellClass}
+                  value={newTask.type}
+                  onChange={(e) =>
+                    setNewTask({ ...newTask, type: e.target.value })
+                  }
+                >
+                  {TASK_TYPES.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td colSpan={7} className="px-1 py-2">
+                <Button
+                  size="sm"
+                  onClick={createTask}
+                  disabled={creatingTask || !newTask.apartmentId}
+                >
+                  {creatingTask ? (
+                    <Loader2 className="size-4 mr-1 animate-spin" />
+                  ) : (
+                    <Plus className="size-4 mr-1" />
+                  )}
+                  Add task
+                </Button>
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -585,7 +843,10 @@ function WeeklyView({
   const [loading, setLoading] = useState(true);
   const [editingShifts, setEditingShifts] = useState(false);
   const [shiftInputs, setShiftInputs] = useState<
-    Record<string, Record<string, { start: string; end: string; dayOff: boolean }>>
+    Record<
+      string,
+      Record<string, { start: string; end: string; dayOff: boolean }>
+    >
   >({});
   const [savingShifts, setSavingShifts] = useState(false);
 
@@ -710,7 +971,10 @@ function WeeklyView({
             <tr className="bg-muted/60 border-b">
               <th className="px-3 py-2 text-left font-semibold w-32" />
               {data.days.map((d) => (
-                <th key={d.date} className="px-3 py-2 text-center font-semibold">
+                <th
+                  key={d.date}
+                  className="px-3 py-2 text-center font-semibold"
+                >
                   <div>{format(parseISO(d.date), "d MMM")}</div>
                   <div className="text-xs text-muted-foreground font-normal">
                     {d.dayOfWeek}
@@ -784,7 +1048,9 @@ function WeeklyView({
                                 setShiftInputs(next);
                               }}
                             />
-                            <span className="text-[10px] text-red-600">Off</span>
+                            <span className="text-[10px] text-red-600">
+                              Off
+                            </span>
                           </label>
                         </div>
                       </td>
@@ -850,7 +1116,10 @@ function WeeklyView({
           </thead>
           <tbody className="divide-y">
             {data.days.map((day) => (
-              <tr key={day.date} className="hover:bg-muted/30 transition-colors align-top">
+              <tr
+                key={day.date}
+                className="hover:bg-muted/30 transition-colors align-top"
+              >
                 <td className="px-3 py-2 whitespace-nowrap">
                   <div className="font-semibold">
                     {format(parseISO(day.date), "d MMM")}

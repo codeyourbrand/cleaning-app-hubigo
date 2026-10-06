@@ -62,6 +62,11 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
   }
 
   const data: any = { ...parsed.data };
+  if (data.status && data.status !== oldTask.status) {
+    const done = data.status === "DONE";
+    data.doneAt = done ? new Date() : null;
+    data.doneByUserId = done ? ctx.user.userId : null;
+  }
   const task = await prisma.task.update({
     where: { id },
     data,
