@@ -156,7 +156,7 @@ async function findOrCreateApartment(
   // Auto-create default inventory checklist for the new apartment
   if (apartment && coordinatorId) {
     try {
-      await createDefaultChecklist(apartment.id, coordinatorId);
+      await createDefaultChecklist(apartment.id, mapped.number, coordinatorId);
     } catch {
       // Don't fail the sync if checklist creation fails
     }
@@ -167,6 +167,7 @@ async function findOrCreateApartment(
 
 async function createDefaultChecklist(
   apartmentId: string,
+  apartmentNumber: string,
   coordinatorId: string,
 ) {
   // Check if a checklist already exists for this apartment
@@ -177,7 +178,7 @@ async function createDefaultChecklist(
 
   return prisma.inventoryChecklist.create({
     data: {
-      name: "Inventory",
+      name: apartmentNumber,
       type: "APARTMENT",
       apartmentId,
       createdByUserId: coordinatorId,

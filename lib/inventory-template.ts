@@ -1,7 +1,7 @@
 /**
  * Default inventory checklist template for apartments.
- * Items are grouped by room/section using section headers (quantity=0).
- * Based on the standard Hubigo apartment inventory spreadsheet.
+ * Items are ordered by room, following the standard Hubigo
+ * apartment inventory spreadsheet.
  */
 
 export type TemplateItem = {
@@ -12,12 +12,10 @@ export type TemplateItem = {
 
 export const DEFAULT_APARTMENT_INVENTORY: TemplateItem[] = [
   // ── Entrance ──
-  { name: "── Entrance ──", quantity: 0, notes: "section" },
   { name: "Keys + keychains (2 pcs)", quantity: 2 },
   { name: "Plexi with Hubigo", quantity: 1 },
 
   // ── Bedroom ──
-  { name: "── Bedroom ──", quantity: 0, notes: "section" },
   { name: "Kingsize bed + mattress", quantity: 1 },
   { name: "Set of duvets + pillows", quantity: 1 },
   { name: "Bedruner + decorative pillow", quantity: 1 },
@@ -29,7 +27,6 @@ export const DEFAULT_APARTMENT_INVENTORY: TemplateItem[] = [
   { name: "TV", quantity: 1 },
 
   // ── Bathroom ──
-  { name: "── Bathroom ──", quantity: 0, notes: "section" },
   { name: "Hairdryer", quantity: 1 },
   { name: "Perfume bottles with sticks", quantity: 1 },
   { name: "Soapdishes", quantity: 1 },
@@ -38,7 +35,6 @@ export const DEFAULT_APARTMENT_INVENTORY: TemplateItem[] = [
   { name: "Bathroom bin", quantity: 1 },
 
   // ── Guest Bathroom ──
-  { name: "── Guest Bathroom ──", quantity: 0, notes: "section" },
   { name: "Hairdryer (guest)", quantity: 0 },
   { name: "Perfume bottles with sticks (guest)", quantity: 0 },
   { name: "Soapdishes (guest)", quantity: 1 },
@@ -47,7 +43,6 @@ export const DEFAULT_APARTMENT_INVENTORY: TemplateItem[] = [
   { name: "Bathroom bin (guest)", quantity: 1 },
 
   // ── Kitchen ──
-  { name: "── Kitchen ──", quantity: 0, notes: "section" },
   { name: "Fridge", quantity: 1 },
   { name: "Washing machine", quantity: 1 },
   { name: "Dishwasher", quantity: 0 },
@@ -88,14 +83,12 @@ export const DEFAULT_APARTMENT_INVENTORY: TemplateItem[] = [
   { name: "Kitchen bin", quantity: 1 },
 
   // ── Balcony ──
-  { name: "── Balcony ──", quantity: 0, notes: "section" },
   { name: "Chairs (balcony)", quantity: 2 },
   { name: "Tables (balcony)", quantity: 1 },
   { name: "Ashtray", quantity: 1 },
   { name: "Laundry dryer", quantity: 1 },
 
   // ── Living Room ──
-  { name: "── Living Room ──", quantity: 0, notes: "section" },
   { name: "Air freshener", quantity: 1 },
   { name: "Dining table", quantity: 2 },
   { name: "Chairs (living room)", quantity: 0, notes: "check quantity" },

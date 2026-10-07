@@ -168,9 +168,7 @@ export default function InventoryPage() {
             onClick={() => toggleSort(s.field)}
           >
             {s.label}
-            {sortBy === s.field && (
-              <ArrowUpDown className="size-3 ml-1" />
-            )}
+            {sortBy === s.field && <ArrowUpDown className="size-3 ml-1" />}
           </Button>
         ))}
       </div>
@@ -193,13 +191,15 @@ export default function InventoryPage() {
               <div className="rounded-2xl border bg-card p-4 hover:shadow-md transition-shadow h-full">
                 <div className="flex items-start justify-between mb-2">
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-bold text-lg truncate">{c.name}</h3>
+                    <h3 className="font-bold text-lg truncate">
+                      {c.type === "APARTMENT" && c.apartment
+                        ? c.apartment.number
+                        : c.name}
+                    </h3>
                     {c.apartment && (
                       <p className="text-sm text-muted-foreground">
-                        {c.apartment.number}
-                        {c.apartment.building
-                          ? ` · ${c.apartment.building}`
-                          : ""}
+                        {c.name !== c.apartment.number ? `${c.name} · ` : ""}
+                        {c.apartment.building || "—"}
                       </p>
                     )}
                   </div>
@@ -296,9 +296,7 @@ function CreateChecklistForm({
         <select
           id="cl-type"
           value={form.type}
-          onChange={(e) =>
-            setForm({ ...form, type: e.target.value as Tab })
-          }
+          onChange={(e) => setForm({ ...form, type: e.target.value as Tab })}
           className={selectClass}
         >
           <option value="APARTMENT">Apartment</option>
@@ -311,9 +309,7 @@ function CreateChecklistForm({
           <select
             id="cl-apartment"
             value={form.apartmentId}
-            onChange={(e) =>
-              setForm({ ...form, apartmentId: e.target.value })
-            }
+            onChange={(e) => setForm({ ...form, apartmentId: e.target.value })}
             className={selectClass}
           >
             <option value="">Select apartment</option>

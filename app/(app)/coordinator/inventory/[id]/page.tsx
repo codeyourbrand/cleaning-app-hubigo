@@ -217,7 +217,10 @@ function ChecklistDetail({ checklistId }: { checklistId: string }) {
     );
   }
 
-  const sortedItems = [...checklist.items].sort((a, b) => {
+  // Hide legacy "section" header rows (── Room ──) stored as items
+  const visibleItems = checklist.items.filter((i) => i.notes !== "section");
+
+  const sortedItems = [...visibleItems].sort((a, b) => {
     const dir = sortDir === "asc" ? 1 : -1;
     switch (sortBy) {
       case "name":
@@ -231,8 +234,8 @@ function ChecklistDetail({ checklistId }: { checklistId: string }) {
     }
   });
 
-  const checkedCount = checklist.items.filter((i) => i.checked).length;
-  const totalCount = checklist.items.length;
+  const checkedCount = visibleItems.filter((i) => i.checked).length;
+  const totalCount = visibleItems.length;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -277,9 +280,7 @@ function ChecklistDetail({ checklistId }: { checklistId: string }) {
             {checkedCount} / {totalCount} checked
           </span>
           <span className="text-muted-foreground">
-            {totalCount > 0
-              ? Math.round((checkedCount / totalCount) * 100)
-              : 0}
+            {totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}
             %
           </span>
         </div>
