@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { MessageSquare, Send, AlertCircle, CheckCircle2 } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  MessageSquare,
+  Play,
+  Plus,
+  RefreshCw,
+  Send,
+  UserRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,9 +89,7 @@ export default function WhatsAppNotificationsPage() {
       }
       toast.success("Test message sent to WhatsApp group!");
     } catch (err) {
-      toast.error(
-        (err as Error).message || "Failed to send test message",
-      );
+      toast.error((err as Error).message || "Failed to send test message");
     } finally {
       setTesting(false);
     }
@@ -132,9 +139,15 @@ export default function WhatsAppNotificationsPage() {
           <div className="text-sm text-amber-800 dark:text-amber-200">
             <p className="font-medium mb-1">Configuration required</p>
             <p>
-              Set <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">WHAPI_TOKEN</code> and{" "}
-              <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">WHAPI_GROUP_ID</code> in
-              your environment variables to enable WhatsApp notifications.
+              Set{" "}
+              <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">
+                WHAPI_TOKEN
+              </code>{" "}
+              and{" "}
+              <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">
+                WHAPI_GROUP_ID
+              </code>{" "}
+              in your environment variables to enable WhatsApp notifications.
             </p>
             <p className="mt-1">
               Get your token from{" "}
@@ -147,7 +160,10 @@ export default function WhatsAppNotificationsPage() {
                 whapi.cloud
               </a>
               . The group ID can be found using the Whapi API{" "}
-              <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">GET /groups</code> endpoint.
+              <code className="font-mono bg-amber-100 dark:bg-amber-900 px-1 rounded">
+                GET /groups
+              </code>{" "}
+              endpoint.
             </p>
           </div>
         </div>
@@ -220,42 +236,43 @@ export default function WhatsAppNotificationsPage() {
 }
 
 function EventIcon({ eventType }: { eventType: string }) {
-  const base = "size-8 rounded-lg flex items-center justify-center text-white";
+  const base =
+    "size-9 shrink-0 rounded-xl flex items-center justify-center text-white shadow-sm";
   switch (eventType) {
     case "TASK_CREATED":
       return (
         <div className={`${base} bg-blue-500`}>
-          <span className="text-sm">+</span>
+          <Plus className="size-5" strokeWidth={2.25} />
         </div>
       );
     case "TASK_ASSIGNED":
       return (
         <div className={`${base} bg-purple-500`}>
-          <span className="text-sm">👤</span>
+          <UserRound className="size-5" strokeWidth={2.25} />
         </div>
       );
     case "TASK_STARTED":
       return (
         <div className={`${base} bg-amber-500`}>
-          <span className="text-sm">▶</span>
+          <Play className="size-5 fill-current" strokeWidth={2.25} />
         </div>
       );
     case "TASK_COMPLETED":
       return (
         <div className={`${base} bg-green-500`}>
-          <CheckCircle2 className="size-4" />
+          <CheckCircle2 className="size-5" strokeWidth={2.25} />
         </div>
       );
     case "REFRESH_CREATED":
       return (
         <div className={`${base} bg-cyan-500`}>
-          <span className="text-sm">🔄</span>
+          <RefreshCw className="size-5" strokeWidth={2.25} />
         </div>
       );
     default:
       return (
         <div className={`${base} bg-gray-500`}>
-          <MessageSquare className="size-4" />
+          <MessageSquare className="size-5" strokeWidth={2.25} />
         </div>
       );
   }
