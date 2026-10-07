@@ -1,11 +1,12 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
 import { promises as fs } from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+
+async function getS3Client() {
+  const { S3Client, PutObjectCommand, DeleteObjectCommand } =
+    await import("@aws-sdk/client-s3");
+  return { S3Client, PutObjectCommand, DeleteObjectCommand };
+}
 
 export interface StoredFile {
   url: string;
@@ -82,20 +83,16 @@ class LocalStorageProvider implements StorageProvider {
 }
 
 class S3StorageProvider implements StorageProvider {
-  private client: S3Client;
+  private client: any;
   private bucket: string;
   private publicBase?: string;
+  private PutObjectCommand: any;
+  private DeleteObjectCommand: any;
 
-  constructor() {
-    this.client = new S3Client({
-      endpoint: process.env.S3_ENDPOINT,
-      region: process.env.S3_REGION ?? "us-east-1",
-      credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY ?? "",
-        secretAccessKey: process.env.S3_SECRET_KEY ?? "",
-      },
-      forcePathStyle: true,
-    });
+  constructor(client: any, PutObjectCommand: any, DeleteObjectCommand: any) {
+    this.client = client;
+    this.PutObjectCommand = PutObjectCommand;
+    this.DeleteObjectCommand = DeleteObjectCommand;
     this.bucket = process.env.S3_BUCKET ?? "hubigo";
     this.publicBase = process.env.S3_PUBLIC_URL;
   }
@@ -108,7 +105,7 @@ class S3StorageProvider implements StorageProvider {
     validateFile(file, contentType);
     const key = generateKey(originalName);
     await this.client.send(
-      new PutObjectCommand({
+      new this.PutObjectCommand({
         Bucket: this.bucket,
         Key: key,
         Body: file,
@@ -123,12 +120,12 @@ class S3StorageProvider implements StorageProvider {
 
   async delete(key: string): Promise<void> {
     await this.client.send(
-      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+      new this.DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
     );
   }
 }
 
-export function getStorageProvider(): StorageProvider {
+export async function getStorageProvider(): Promise<StorageProvider> {
   const provider = process.env.STORAGE_PROVIDER ?? "local";
   if (provider === "s3") {
     if (
@@ -138,7 +135,18 @@ export function getStorageProvider(): StorageProvider {
     ) {
       throw new Error("S3 storage is missing required configuration");
     }
-    return new S3StorageProvider();
+    const { S3Client, PutObjectCommand, DeleteObjectCommand } =
+      await getS3Client();
+    const client = new S3Client({
+      endpoint: process.env.S3_ENDPOINT,
+      region: process.env.S3_REGION ?? "us-east-1",
+      credentials: {
+        accessKeyId: process.env.S3_ACCESS_KEY ?? "",
+        secretAccessKey: process.env.S3_SECRET_KEY ?? "",
+      },
+      forcePathStyle: true,
+    });
+    return new S3StorageProvider(client, PutObjectCommand, DeleteObjectCommand);
   }
   return new LocalStorageProvider();
 }
