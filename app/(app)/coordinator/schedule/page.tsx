@@ -51,6 +51,7 @@ type ScheduleNote = {
   id: string;
   date: string;
   note: string;
+  kind: "GENERAL" | "WEEKLY_NOTE" | "MAINTENANCE" | "IN_CHARGE";
   sortOrder: number;
 };
 
@@ -773,25 +774,27 @@ function DailyView({
                 </td>
               </tr>
             ))}
-            {data.notes.map((n) => (
-              <tr key={n.id}>
-                <td
-                  colSpan={10}
-                  className="border border-black py-2 text-center font-bold"
-                >
-                  {n.note}
-                </td>
-                <td className="px-1 text-center">
-                  <button
-                    onClick={() => deleteNote(n.id)}
-                    className="text-muted-foreground hover:text-red-600"
-                    aria-label="Delete note"
+            {data.notes
+              .filter((note) => note.kind === "GENERAL")
+              .map((n) => (
+                <tr key={n.id}>
+                  <td
+                    colSpan={10}
+                    className="border border-black py-2 text-center font-bold"
                   >
-                    <X className="size-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
+                    {n.note}
+                  </td>
+                  <td className="px-1 text-center">
+                    <button
+                      onClick={() => deleteNote(n.id)}
+                      className="text-muted-foreground hover:text-red-600"
+                      aria-label="Delete note"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             <tr className="bg-slate-50">
               <td className="border border-black px-1 py-2">
                 <input
@@ -896,38 +899,74 @@ function WeeklyView({
   >({});
   const [savingShifts, setSavingShifts] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/schedule?week=${weekStr}`);
-      if (!res.ok) throw new Error();
-      const d: WeeklyData = await res.json();
-      setData(d);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!silent) setLoading(true);
+      try {
+        const res = await fetch(`/api/schedule?week=${weekStr}`);
+        if (!res.ok) throw new Error();
+        const d: WeeklyData = await res.json();
+        setData(d);
 
-      // Init shift inputs: cleanerId -> dateStr -> { start, end, dayOff }
-      const inputs: typeof shiftInputs = {};
-      for (const c of d.cleaners) {
-        inputs[c.id] = {};
-        for (const day of d.days) {
-          const existing = day.shifts.find((s) => s.userId === c.id);
-          inputs[c.id][day.date] = {
-            start: existing?.startTime ?? "",
-            end: existing?.endTime ?? "",
-            dayOff: existing?.dayOff ?? false,
-          };
+        // Init shift inputs: cleanerId -> dateStr -> { start, end, dayOff }
+        const inputs: typeof shiftInputs = {};
+        for (const c of d.cleaners) {
+          inputs[c.id] = {};
+          for (const day of d.days) {
+            const existing = day.shifts.find((s) => s.userId === c.id);
+            inputs[c.id][day.date] = {
+              start: existing?.startTime ?? "",
+              end: existing?.endTime ?? "",
+              dayOff: existing?.dayOff ?? false,
+            };
+          }
         }
+        setShiftInputs(inputs);
+      } catch {
+        toast.error("Failed to load weekly schedule");
+      } finally {
+        setLoading(false);
       }
-      setShiftInputs(inputs);
-    } catch {
-      toast.error("Failed to load weekly schedule");
-    } finally {
-      setLoading(false);
-    }
-  }, [weekStr]);
+    },
+    [weekStr],
+  );
 
   useEffect(() => {
     load();
   }, [load]);
+
+  async function saveNote(
+    day: WeekDay,
+    kind: ScheduleNote["kind"],
+    value: string,
+  ) {
+    const existing = day.notes.find((note) => note.kind === kind);
+    const trimmed = value.trim();
+    try {
+      const res = existing
+        ? await fetch("/api/schedule/notes", {
+            method: trimmed ? "PATCH" : "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+              trimmed
+                ? { id: existing.id, note: trimmed }
+                : { id: existing.id },
+            ),
+          })
+        : trimmed
+          ? await fetch("/api/schedule/notes", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ date: day.date, note: trimmed, kind }),
+            })
+          : null;
+      if (res && !res.ok) throw new Error();
+      if (res) await load(true);
+    } catch {
+      toast.error("Failed to save schedule note");
+      await load(true);
+    }
+  }
 
   async function saveShifts() {
     setSavingShifts(true);
@@ -1158,6 +1197,48 @@ function WeeklyView({
                 })}
               </tr>
             ))}
+            <tr>
+              <td
+                colSpan={2}
+                className="border border-black px-2 py-1 text-center"
+              >
+                Maintenance
+              </td>
+              {data.days.map((day) => {
+                const note = day.notes.find(
+                  (item) => item.kind === "MAINTENANCE",
+                );
+                return (
+                  <td key={day.date} className="border border-black px-1 py-1">
+                    <CellInput
+                      value={note?.note ?? ""}
+                      onSave={(value) => saveNote(day, "MAINTENANCE", value)}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
+            <tr>
+              <td
+                colSpan={2}
+                className="border border-black px-2 py-1 text-center font-bold"
+              >
+                IN CHARGE
+              </td>
+              {data.days.map((day) => {
+                const note = day.notes.find(
+                  (item) => item.kind === "IN_CHARGE",
+                );
+                return (
+                  <td key={day.date} className="border border-black px-1 py-1">
+                    <CellInput
+                      value={note?.note ?? ""}
+                      onSave={(value) => saveNote(day, "IN_CHARGE", value)}
+                    />
+                  </td>
+                );
+              })}
+            </tr>
           </tbody>
         </table>
 
@@ -1201,12 +1282,17 @@ function WeeklyView({
                       },
                     ]
                   : []),
-                ...day.notes.map((n) => ({
-                  key: n.id,
-                  cls: "text-red-700",
-                  text: n.note,
-                })),
+                ...day.notes
+                  .filter((note) => note.kind === "GENERAL")
+                  .map((note) => ({
+                    key: note.id,
+                    cls: "text-red-700",
+                    text: note.note,
+                  })),
               ];
+              const manualNote = day.notes.find(
+                (note) => note.kind === "WEEKLY_NOTE",
+              );
               return (
                 <tr key={day.date}>
                   <td className="w-28 border border-black px-3 py-1 text-center">
@@ -1215,13 +1301,20 @@ function WeeklyView({
                   <td className="w-28 border border-black px-3 py-1 text-center">
                     {day.dayOfWeek}
                   </td>
-                  <td className="border border-black px-3 py-1 text-center">
-                    {parts.map((part, i) => (
-                      <span key={part.key} className={part.cls}>
-                        {i > 0 && <span className="text-black">, </span>}
-                        {part.text}
-                      </span>
-                    ))}
+                  <td className="border border-black px-2 py-1 text-center">
+                    <div>
+                      {parts.map((part, i) => (
+                        <span key={part.key} className={part.cls}>
+                          {i > 0 && <span className="text-black">, </span>}
+                          {part.text}
+                        </span>
+                      ))}
+                    </div>
+                    <CellInput
+                      value={manualNote?.note ?? ""}
+                      className="mt-1 text-red-700"
+                      onSave={(value) => saveNote(day, "WEEKLY_NOTE", value)}
+                    />
                   </td>
                 </tr>
               );

@@ -362,10 +362,12 @@ model ScheduleNote {
   id        String   @id @default(cuid())
   date      DateTime @db.Date
   note      String
+  kind      String   @default("GENERAL")
   sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([date])
+  @@index([date, kind])
   @@map("schedule_notes")
 }
