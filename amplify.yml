@@ -37,11 +37,8 @@ frontend:
         - NODE_ENV=production npm run build
         - rm -rf .next/cache .next/diagnostics .next/types .next/trace-build
         - find .next -name '*.map' -delete
-        - rm -f .next/standalone/node_modules/.prisma/client/libquery_engine-linux-musl*
-        - rm -f .next/standalone/node_modules/.prisma/client/libquery_engine-darwin*
-        - find .next/standalone/node_modules/@prisma/client/runtime -name '*.wasm-base64.*' ! -name '*postgresql*' -delete
-        - rm -rf .next/standalone/node_modules/@img/sharp-libvips-darwin* .next/standalone/node_modules/@img/sharp-darwin*
-        - du -sh .next
+        - for d in .next/standalone/node_modules node_modules; do rm -f $d/.prisma/client/libquery_engine-linux-musl* $d/.prisma/client/libquery_engine-darwin*; find $d/@prisma/client/runtime -name '*.wasm-base64.*' ! -name '*postgresql*' -delete; rm -rf $d/@img/sharp-libvips-darwin* $d/@img/sharp-darwin* $d/@img/sharp-wasm32; done
+        - du -sh .next node_modules/.prisma node_modules/@prisma/client
   artifacts:
     baseDirectory: .next
     files:
