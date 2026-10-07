@@ -35,6 +35,11 @@ frontend:
         - echo "NEXT_TELEMETRY_DISABLED=$NEXT_TELEMETRY_DISABLED" >> .env.production
         - NODE_ENV=production npm run build
         - cp .next/required-server-files.json .next/standalone/required-server-files.json
+        - cp .next/required-server-files.js .next/standalone/required-server-files.js
+        - cp .next/trace .next/standalone/trace
+        - cp .next/build-manifest.json .next/standalone/build-manifest.json
+        - cp .next/prerender-manifest.json .next/standalone/prerender-manifest.json
+        - cp .next/routes-manifest.json .next/standalone/routes-manifest.json
         - cp -r .next/static .next/standalone/.next/static
         - du -sh .next/standalone
   artifacts:
