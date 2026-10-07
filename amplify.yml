@@ -34,6 +34,9 @@ frontend:
         - echo "NODE_ENV=$NODE_ENV" >> .env.production
         - echo "NEXT_TELEMETRY_DISABLED=$NEXT_TELEMETRY_DISABLED" >> .env.production
         - NODE_ENV=production npm run build
+        - find .next -name '*.map' -delete
+        - rm -rf .next/cache
+        - du -sh .next
   artifacts:
     baseDirectory: .next
     files:
