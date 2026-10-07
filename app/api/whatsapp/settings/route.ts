@@ -3,12 +3,19 @@ import { withRole } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import {
+  WHATSAPP_DESTINATION_LABELS,
   WHATSAPP_EVENT_LABELS,
   isWhatsAppConfigured,
+  type WhatsAppDestination,
   type WhatsAppEventType,
 } from "@/lib/whatsapp";
 
-const VALID_EVENT_TYPES = Object.keys(WHATSAPP_EVENT_LABELS) as WhatsAppEventType[];
+const VALID_EVENT_TYPES = Object.keys(
+  WHATSAPP_EVENT_LABELS,
+) as WhatsAppEventType[];
+const VALID_DESTINATIONS = Object.keys(
+  WHATSAPP_DESTINATION_LABELS,
+) as WhatsAppDestination[];
 
 /** GET — return all settings (seed defaults for missing event types). */
 export const GET = withRole([Role.COORDINATOR], async () => {
@@ -32,24 +39,42 @@ export const GET = withRole([Role.COORDINATOR], async () => {
     settings,
     configured: isWhatsAppConfigured(),
     labels: WHATSAPP_EVENT_LABELS,
+    destinationLabels: WHATSAPP_DESTINATION_LABELS,
   });
 });
 
-/** PATCH — bulk-update enabled flags. Body: { updates: [{ eventType, enabled }] } */
+/** PATCH — bulk-update settings. Body: { updates: [{ eventType, enabled?, destination? }] } */
 export const PATCH = withRole([Role.COORDINATOR], async (req: NextRequest) => {
   const body = await req.json();
-  const updates: { eventType: string; enabled: boolean }[] = body.updates;
+  const updates: {
+    eventType: string;
+    enabled?: boolean;
+    destination?: string;
+  }[] = body.updates;
 
   if (!Array.isArray(updates)) {
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   }
 
-  for (const { eventType, enabled } of updates) {
+  for (const { eventType, enabled, destination } of updates) {
     if (!VALID_EVENT_TYPES.includes(eventType as WhatsAppEventType)) continue;
+    if (
+      destination !== undefined &&
+      !VALID_DESTINATIONS.includes(destination as WhatsAppDestination)
+    )
+      continue;
+    const data = {
+      ...(enabled !== undefined ? { enabled } : {}),
+      ...(destination !== undefined ? { destination } : {}),
+    };
     await prisma.whatsAppNotificationSetting.upsert({
       where: { eventType },
-      create: { eventType, enabled },
-      update: { enabled },
+      create: {
+        eventType,
+        enabled: enabled ?? false,
+        destination: destination ?? "GROUP",
+      },
+      update: data,
     });
   }
 

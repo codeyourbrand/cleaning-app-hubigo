@@ -311,9 +311,10 @@ model InventoryChecklist {
 }
 
 model WhatsAppNotificationSetting {
-  id        String   @id @default(cuid())
-  eventType String   @unique @map("event_type")
-  enabled   Boolean  @default(true)
+  id          String   @id @default(cuid())
+  eventType   String   @unique @map("event_type")
+  enabled     Boolean  @default(true)
+  destination String   @default("GROUP") // GROUP | USER | BOTH
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

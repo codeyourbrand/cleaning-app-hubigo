@@ -73,6 +73,7 @@ const ACTION_LABELS: Record<string, string> = {
   INVENTORY_ITEM_DELETED: "Item deleted",
   INVENTORY_ITEM_CHECKED: "Item checked",
   INVENTORY_ITEM_UNCHECKED: "Item unchecked",
+  WHATSAPP_SKIPPED: "WhatsApp notification skipped",
 };
 
 function getActionBadgeColor(action: string): string {

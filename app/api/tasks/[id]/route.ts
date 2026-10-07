@@ -90,13 +90,18 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
       where: { id },
       include: {
         apartment: true,
-        assignedTo: { select: { name: true } },
+        assignedTo: { select: { name: true, phone: true } },
       },
     });
     if (fullTask) {
       sendWhatsAppNotification(
         "TASK_ASSIGNED",
         buildTaskAssignedMessage(fullTask),
+        {
+          actorUserId: ctx.user.userId,
+          taskId: id,
+          recipient: fullTask.assignedTo,
+        },
       ).catch(() => {});
     }
   }

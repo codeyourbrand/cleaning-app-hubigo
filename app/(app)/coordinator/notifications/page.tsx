@@ -20,12 +20,14 @@ type Setting = {
   id: string;
   eventType: string;
   enabled: boolean;
+  destination: "GROUP" | "USER" | "BOTH";
 };
 
 type SettingsResponse = {
   settings: Setting[];
   configured: boolean;
   labels: Record<string, string>;
+  destinationLabels: Record<string, string>;
 };
 
 export default function WhatsAppNotificationsPage() {
@@ -50,14 +52,17 @@ export default function WhatsAppNotificationsPage() {
     fetchSettings();
   }, [fetchSettings]);
 
-  async function toggleSetting(eventType: string, enabled: boolean) {
+  async function updateSetting(
+    eventType: string,
+    patch: Partial<Pick<Setting, "enabled" | "destination">>,
+  ) {
     if (!data) return;
 
     // Optimistic update
     setData({
       ...data,
       settings: data.settings.map((s) =>
-        s.eventType === eventType ? { ...s, enabled } : s,
+        s.eventType === eventType ? { ...s, ...patch } : s,
       ),
     });
 
@@ -66,7 +71,7 @@ export default function WhatsAppNotificationsPage() {
       const res = await fetch("/api/whatsapp/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ updates: [{ eventType, enabled }] }),
+        body: JSON.stringify({ updates: [{ eventType, ...patch }] }),
       });
       if (!res.ok) throw new Error("Failed to save");
       const updated = await res.json();
@@ -173,7 +178,8 @@ export default function WhatsAppNotificationsPage() {
         <div className="border-b px-4 py-3">
           <h2 className="font-semibold">Notification events</h2>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Toggle which events send a message to your WhatsApp group.
+            Choose which events send a message and where: to the group, to the
+            person directly (their WhatsApp number), or both.
           </p>
         </div>
         <div className="divide-y">
@@ -193,18 +199,43 @@ export default function WhatsAppNotificationsPage() {
                   </div>
                 </div>
               </div>
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={setting.enabled}
-                  onChange={(e) =>
-                    toggleSetting(setting.eventType, e.target.checked)
-                  }
-                  disabled={saving || !data.configured}
-                />
-                <div className="w-11 h-6 bg-muted rounded-full peer-checked:bg-green-600 transition-colors" />
-                <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+              <div className="flex items-center gap-3">
+                {setting.enabled && (
+                  <select
+                    value={setting.destination}
+                    onChange={(e) =>
+                      updateSetting(setting.eventType, {
+                        destination: e.target.value as Setting["destination"],
+                      })
+                    }
+                    disabled={saving || !data.configured}
+                    onClick={(e) => e.preventDefault()}
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  >
+                    {Object.entries(data.destinationLabels).map(
+                      ([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                )}
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only peer"
+                    checked={setting.enabled}
+                    onChange={(e) =>
+                      updateSetting(setting.eventType, {
+                        enabled: e.target.checked,
+                      })
+                    }
+                    disabled={saving || !data.configured}
+                  />
+                  <div className="w-11 h-6 bg-muted rounded-full peer-checked:bg-green-600 transition-colors" />
+                  <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
+                </div>
               </div>
             </label>
           ))}

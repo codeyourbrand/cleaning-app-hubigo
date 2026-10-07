@@ -64,11 +64,12 @@ export const POST = withRole(
     // WhatsApp notification
     const startedUser = await prisma.user.findUnique({
       where: { id: ctx.user.userId },
-      select: { name: true },
+      select: { name: true, phone: true },
     });
     sendWhatsAppNotification(
       "TASK_STARTED",
       buildTaskStartedMessage({ ...updated, startedBy: startedUser }),
+      { actorUserId: ctx.user.userId, taskId: id, recipient: startedUser },
     ).catch(() => {});
 
     return NextResponse.json({ task: updated });

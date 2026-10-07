@@ -26,7 +26,8 @@ export type AuditAction =
   | "INVENTORY_ITEM_UPDATED"
   | "INVENTORY_ITEM_DELETED"
   | "INVENTORY_ITEM_CHECKED"
-  | "INVENTORY_ITEM_UNCHECKED";
+  | "INVENTORY_ITEM_UNCHECKED"
+  | "WHATSAPP_SKIPPED";
 
 /** Map actions to a category for filtering in the logs UI. */
 export type AuditCategory = "TASK" | "INVENTORY" | "SYNC" | "OTHER";

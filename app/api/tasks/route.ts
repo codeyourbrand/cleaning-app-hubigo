@@ -121,18 +121,28 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
     where: { id: task.id },
     include: {
       apartment: true,
-      assignedTo: { select: { name: true } },
+      assignedTo: { select: { name: true, phone: true } },
     },
   });
   if (fullTask) {
     sendWhatsAppNotification(
       "TASK_CREATED",
       buildTaskCreatedMessage(fullTask),
+      {
+        actorUserId: ctx.user.userId,
+        taskId: task.id,
+        recipient: fullTask.assignedTo,
+      },
     ).catch(() => {});
     if (assignedToUserId) {
       sendWhatsAppNotification(
         "TASK_ASSIGNED",
         buildTaskAssignedMessage(fullTask),
+        {
+          actorUserId: ctx.user.userId,
+          taskId: task.id,
+          recipient: fullTask.assignedTo,
+        },
       ).catch(() => {});
     }
   }

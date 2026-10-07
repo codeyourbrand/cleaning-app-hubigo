@@ -1,4 +1,5 @@
 import { formatDateOnly } from "@/lib/datetime";
+import { logAudit } from "./audit";
 import { prisma } from "./prisma";
 
 const WHAPI_BASE_URL = "https://gate.whapi.cloud";
@@ -10,6 +11,8 @@ export type WhatsAppEventType =
   | "TASK_COMPLETED"
   | "REFRESH_CREATED";
 
+export type WhatsAppDestination = "GROUP" | "USER" | "BOTH";
+
 export const WHATSAPP_EVENT_LABELS: Record<WhatsAppEventType, string> = {
   TASK_CREATED: "New task created",
   TASK_ASSIGNED: "Person assigned to task",
@@ -18,6 +21,13 @@ export const WHATSAPP_EVENT_LABELS: Record<WhatsAppEventType, string> = {
   REFRESH_CREATED: "Refresh task auto-created",
 };
 
+export const WHATSAPP_DESTINATION_LABELS: Record<WhatsAppDestination, string> =
+  {
+    GROUP: "Group",
+    USER: "Person",
+    BOTH: "Group + person",
+  };
+
 function getConfig() {
   const token = process.env.WHAPI_TOKEN;
   const groupId = process.env.WHAPI_GROUP_ID;
@@ -25,8 +35,13 @@ function getConfig() {
 }
 
 export function isWhatsAppConfigured(): boolean {
-  const { token, groupId } = getConfig();
-  return Boolean(token && groupId);
+  return Boolean(getConfig().token);
+}
+
+/** "…+971 58-590 1656" -> "971585901656@s.whatsapp.net" */
+function phoneToChatId(phone: string): string | null {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 6 ? `${digits}@s.whatsapp.net` : null;
 }
 
 async function sendTextMessage(to: string, body: string): Promise<boolean> {
@@ -58,37 +73,69 @@ async function sendTextMessage(to: string, body: string): Promise<boolean> {
   }
 }
 
-/**
- * Check if a specific event type is enabled in the WhatsApp notification
- * settings. Returns false if no settings exist.
- */
-async function isEventEnabled(eventType: WhatsAppEventType): Promise<boolean> {
-  const setting = await prisma.whatsAppNotificationSetting.findUnique({
+async function getSetting(eventType: WhatsAppEventType) {
+  return prisma.whatsAppNotificationSetting.findUnique({
     where: { eventType },
   });
-  return setting?.enabled ?? false;
+}
+
+export interface WhatsAppNotificationOptions {
+  /** Person the notification is about (used for USER/BOTH destinations). */
+  recipient?: { phone?: string | null; name?: string | null } | null;
+  /** Who triggered the event — used as audit log author when logging skips. */
+  actorUserId?: string;
+  taskId?: string;
 }
 
 /**
- * Send a WhatsApp notification to the configured group, if the event type
- * is enabled and the integration is configured.
+ * Send a WhatsApp notification according to the per-event destination
+ * setting (GROUP, USER or BOTH). USER destinations require a recipient
+ * phone number — a missing number is logged to the audit log and skipped.
  *
  * Failures are caught and logged — never propagated to break the caller.
  */
 export async function sendWhatsAppNotification(
   eventType: WhatsAppEventType,
   message: string,
+  opts: WhatsAppNotificationOptions = {},
 ): Promise<boolean> {
   try {
     if (!isWhatsAppConfigured()) return false;
 
-    const enabled = await isEventEnabled(eventType);
-    if (!enabled) return false;
+    const setting = await getSetting(eventType);
+    if (!setting?.enabled) return false;
 
+    const destination = (setting.destination || "GROUP") as WhatsAppDestination;
     const { groupId } = getConfig();
-    if (!groupId) return false;
+    let sent = false;
 
-    return await sendTextMessage(groupId, message);
+    if (destination === "GROUP" || destination === "BOTH") {
+      if (groupId) {
+        sent = (await sendTextMessage(groupId, message)) || sent;
+      }
+    }
+
+    if (destination === "USER" || destination === "BOTH") {
+      const chatId = opts.recipient?.phone
+        ? phoneToChatId(opts.recipient.phone)
+        : null;
+      if (chatId) {
+        sent = (await sendTextMessage(chatId, message)) || sent;
+      } else if (opts.actorUserId) {
+        await logAudit({
+          userId: opts.actorUserId,
+          taskId: opts.taskId,
+          action: "WHATSAPP_SKIPPED",
+          newValue: {
+            eventType,
+            reason: "Recipient has no valid phone number",
+            recipient: opts.recipient?.name ?? null,
+          },
+        });
+      }
+    }
+
+    return sent;
   } catch (err) {
     console.error("[WhatsApp] Notification error:", err);
     return false;

@@ -412,9 +412,10 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
   });
 
   // WhatsApp notification for new Hostfully task
-  sendWhatsAppNotification("TASK_CREATED", buildTaskCreatedMessage(task)).catch(
-    () => {},
-  );
+  sendWhatsAppNotification("TASK_CREATED", buildTaskCreatedMessage(task), {
+    actorUserId: ctx.coordinatorId,
+    taskId: task.id,
+  }).catch(() => {});
 
   // Auto-generate REFRESH tasks for long stays
   const refreshTasks = await generateRefreshTasks(
@@ -505,6 +506,7 @@ async function generateRefreshTasks(
     sendWhatsAppNotification(
       "REFRESH_CREATED",
       buildRefreshCreatedMessage(refreshTask),
+      { actorUserId: ctx.coordinatorId, taskId: refreshTask.id },
     ).catch(() => {});
   }
   return created;
