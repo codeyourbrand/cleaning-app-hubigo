@@ -212,6 +212,12 @@ export function getLeads(since?: Date): Promise<HostfullyLead[]> {
   if (since) {
     // Hostfully expects yyyy-MM-dd'T'HH:mm:ss (UTC)
     params.updatedSince = since.toISOString().slice(0, 19);
+  } else {
+    // Default sync only needs current/upcoming stays. Including the whole
+    // history can hit broken legacy records that make Hostfully return 500.
+    params.checkOutFrom = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
   }
   return fetchAll<HostfullyLead>("/leads", "leads", params);
 }
