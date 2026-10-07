@@ -13,8 +13,6 @@ import {
   Luggage,
   Car,
   Baby,
-  AlertTriangle,
-  Search,
   X,
   Clock,
   Image as ImageIcon,
@@ -351,19 +349,13 @@ function TaskDetail({ taskId }: { taskId: string }) {
           {task.startedAt && (
             <div className="flex items-center gap-2 text-sm">
               <Clock className="size-4 text-amber-600" />
-              <span>
-                Started:{" "}
-                {formatDateTime(task.startedAt)}
-              </span>
+              <span>Started: {formatDateTime(task.startedAt)}</span>
             </div>
           )}
           {task.doneAt && (
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle2 className="size-4 text-emerald-600" />
-              <span>
-                Finished:{" "}
-                {formatDateTime(task.doneAt)}
-              </span>
+              <span>Finished: {formatDateTime(task.doneAt)}</span>
             </div>
           )}
         </div>
@@ -454,21 +446,6 @@ function TaskDetail({ taskId }: { taskId: string }) {
           onSubmit={(body, files) => addComment(body, undefined, files)}
         />
       </Section>
-
-      <div className="flex gap-2 mt-4">
-        <Link
-          href={`/apartments/${task.apartment.id}/lost-found/new`}
-          className="flex-1 inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <Search className="size-4 mr-1" /> Lost & Found
-        </Link>
-        <Link
-          href={`/apartments/${task.apartment.id}/damage/new`}
-          className="flex-1 inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <AlertTriangle className="size-4 mr-1" /> Damage
-        </Link>
-      </div>
     </div>
   );
 }
