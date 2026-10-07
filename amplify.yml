@@ -1,0 +1,45 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - nvm use 22
+        - NODE_ENV=development npm ci
+        - npx prisma generate
+    build:
+      commands:
+        - echo "DATABASE_URL=$DATABASE_URL" >> .env.production
+        - echo "AUTH_SECRET=$AUTH_SECRET" >> .env.production
+        - echo "NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> .env.production
+        - echo "STORAGE_PROVIDER=$STORAGE_PROVIDER" >> .env.production
+        - echo "S3_ENDPOINT=$S3_ENDPOINT" >> .env.production
+        - echo "S3_REGION=$S3_REGION" >> .env.production
+        - echo "S3_ACCESS_KEY=$S3_ACCESS_KEY" >> .env.production
+        - echo "S3_SECRET_KEY=$S3_SECRET_KEY" >> .env.production
+        - echo "S3_BUCKET=$S3_BUCKET" >> .env.production
+        - echo "S3_PUBLIC_URL=$S3_PUBLIC_URL" >> .env.production
+        - echo "LOCAL_UPLOAD_DIR=$LOCAL_UPLOAD_DIR" >> .env.production
+        - echo "HOSTFULLY_API_KEY=$HOSTFULLY_API_KEY" >> .env.production
+        - echo "HOSTFULLY_AGENCY_UID=$HOSTFULLY_AGENCY_UID" >> .env.production
+        - echo "HOSTFULLY_API_BASE_URL=$HOSTFULLY_API_BASE_URL" >> .env.production
+        - echo "HOSTFULLY_WEBHOOK_SECRET=$HOSTFULLY_WEBHOOK_SECRET" >> .env.production
+        - echo "WHAPI_TOKEN=$WHAPI_TOKEN" >> .env.production
+        - echo "WHAPI_GROUP_ID=$WHAPI_GROUP_ID" >> .env.production
+        - echo "WEB_PUSH_PUBLIC_KEY=$WEB_PUSH_PUBLIC_KEY" >> .env.production
+        - echo "WEB_PUSH_PRIVATE_KEY=$WEB_PUSH_PRIVATE_KEY" >> .env.production
+        - echo "WEB_PUSH_SUBJECT=$WEB_PUSH_SUBJECT" >> .env.production
+        - echo "TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID" >> .env.production
+        - echo "TWILIO_AUTH_TOKEN=$TWILIO_AUTH_TOKEN" >> .env.production
+        - echo "TWILIO_PHONE_NUMBER=$TWILIO_PHONE_NUMBER" >> .env.production
+        - echo "NODE_ENV=$NODE_ENV" >> .env.production
+        - echo "NEXT_TELEMETRY_DISABLED=$NEXT_TELEMETRY_DISABLED" >> .env.production
+        - NODE_ENV=production npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
+      - prisma/generated/**/*
