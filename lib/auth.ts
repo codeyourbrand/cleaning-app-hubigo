@@ -22,11 +22,7 @@ export interface SessionPayload {
 
 export { hashPassword, verifyPassword } from "./password";
 
-export async function createSession(
-  payload: SessionPayload,
-  remember = false,
-): Promise<void> {
-  const expiresIn = remember ? "30d" : "24h";
+export async function createSession(payload: SessionPayload): Promise<void> {
   const token = await new SignJWT({
     userId: payload.userId,
     role: payload.role,
@@ -36,17 +32,15 @@ export async function createSession(
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime(expiresIn)
+    .setExpirationTime("400d")
     .sign(AUTH_SECRET);
-
-  const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24;
 
   (await cookies()).set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
     path: "/",
-    maxAge,
+    maxAge: 60 * 60 * 24 * 400,
   });
 }
 

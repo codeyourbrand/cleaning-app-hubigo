@@ -22,18 +22,19 @@ export const otpVerifySchema = z.object({
 
 export const userCreateSchema = z.object({
   name: z.string().min(1),
-  email: z.string().email().optional(),
-  phone: z.string().min(6).optional(),
+  email: z.string().email().nullable().optional(),
+  phone: z.string().min(6).nullable().optional(),
   role: z.enum([Role.CLEANER, Role.COORDINATOR]),
   password: z.string().min(6),
   active: z.boolean().optional().default(true),
 });
 
 export const userUpdateSchema = z.object({
-  name: z.string().min(1).optional(),
-  email: z.string().email().optional(),
-  phone: z.string().min(6).optional(),
+  name: z.string().trim().min(1).optional(),
+  email: z.string().trim().email().nullable().optional(),
+  phone: z.string().trim().min(6).nullable().optional(),
   role: z.enum([Role.CLEANER, Role.COORDINATOR]).optional(),
+  password: z.string().min(6).optional(),
   active: z.boolean().optional(),
 });
 

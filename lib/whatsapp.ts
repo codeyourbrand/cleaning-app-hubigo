@@ -108,17 +108,33 @@ export async function sendWhatsAppTestMessage(
 // Message builders
 // ---------------------------------------------------------------------------
 
+type TaskSchedule = {
+  checkoutTime?: string | null;
+  checkinWindow?: string | null;
+};
+
+function formatTaskSchedule(task: TaskSchedule): string {
+  return [
+    task.checkoutTime ? `Checkout: ${task.checkoutTime}` : null,
+    task.checkinWindow ? `Check-in: ${task.checkinWindow}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function buildTaskCreatedMessage(task: {
   title?: string | null;
   type: string;
   apartment?: { number: string } | null;
   date: Date | string;
+  checkoutTime?: string | null;
+  checkinWindow?: string | null;
 }): string {
   const name = task.title || task.type;
   const apt = task.apartment?.number ?? "?";
-  const date =
-    formatDateOnly(task.date);
-  return `📋 *New task*\n${name} — Apt ${apt}\nDate: ${date}`;
+  const date = formatDateOnly(task.date);
+  const schedule = formatTaskSchedule(task);
+  return `📋 *New task*\n${name} — Apt ${apt}\nDate: ${date}${schedule ? `\n${schedule}` : ""}`;
 }
 
 export function buildTaskAssignedMessage(task: {
@@ -127,13 +143,15 @@ export function buildTaskAssignedMessage(task: {
   apartment?: { number: string } | null;
   assignedTo?: { name: string } | null;
   date: Date | string;
+  checkoutTime?: string | null;
+  checkinWindow?: string | null;
 }): string {
   const name = task.title || task.type;
   const apt = task.apartment?.number ?? "?";
   const person = task.assignedTo?.name ?? "?";
-  const date =
-    formatDateOnly(task.date);
-  return `👤 *${person}* assigned to:\n${name} — Apt ${apt}\nDate: ${date}`;
+  const date = formatDateOnly(task.date);
+  const schedule = formatTaskSchedule(task);
+  return `👤 *${person}* assigned to:\n${name} — Apt ${apt}\nDate: ${date}${schedule ? `\n${schedule}` : ""}`;
 }
 
 export function buildTaskStartedMessage(task: {
@@ -165,7 +183,6 @@ export function buildRefreshCreatedMessage(task: {
   date: Date | string;
 }): string {
   const apt = task.apartment?.number ?? "?";
-  const date =
-    formatDateOnly(task.date);
+  const date = formatDateOnly(task.date);
   return `🔄 *Auto-refresh* created\nApt ${apt}\nDate: ${date}`;
 }

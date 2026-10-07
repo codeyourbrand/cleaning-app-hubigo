@@ -15,16 +15,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const body =
-      tab === "email"
-        ? { email, password, rememberMe }
-        : { phone, password, rememberMe };
+    const body = tab === "email" ? { email, password } : { phone, password };
 
     try {
       const res = await fetch("/api/auth/login", {
@@ -102,19 +98,6 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 required
               />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                id="remember"
-                type="checkbox"
-                checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="size-4 rounded border-input"
-              />
-              <Label htmlFor="remember" className="text-sm font-normal">
-                Remember me
-              </Label>
             </div>
 
             <Button

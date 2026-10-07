@@ -10,8 +10,11 @@ export async function POST(req: NextRequest) {
   const limit = checkRateLimit(`otp:${ip}`);
   if (!limit.ok) {
     return NextResponse.json(
-      { error: "Too many attempts. Try again later.", retryAfter: limit.retryAfter },
-      { status: 429 }
+      {
+        error: "Too many attempts. Try again later.",
+        retryAfter: limit.retryAfter,
+      },
+      { status: 429 },
     );
   }
 
@@ -20,45 +23,39 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Invalid input", issues: parsed.error.flatten().fieldErrors },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const { email, phone, code, rememberMe } = parsed.data;
+  const { email, phone, code } = parsed.data;
   const identifier = email ?? phone;
   if (!identifier) {
     return NextResponse.json(
       { error: "Email or phone is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   if (!verifyOtp(identifier, code)) {
     return NextResponse.json(
       { error: "Invalid or expired code" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
   const where = email ? { email } : { phone };
   const user = await prisma.user.findFirst({ where });
   if (!user || !user.active) {
-    return NextResponse.json(
-      { error: "User not found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  await createSession(
-    {
-      userId: user.id,
-      role: user.role,
-      name: user.name,
-      email: user.email,
-      phone: user.phone,
-    },
-    rememberMe
-  );
+  await createSession({
+    userId: user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+  });
 
   return NextResponse.json({
     user: {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,26 +15,40 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
+type Role = "CLEANER" | "COORDINATOR";
+
 type User = {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
-  role: "CLEANER" | "COORDINATOR";
+  role: Role;
   active: boolean;
+};
+
+type UserForm = {
+  name: string;
+  email: string;
+  phone: string;
+  role: Role;
+  password: string;
+};
+
+const emptyForm: UserForm = {
+  name: "",
+  email: "",
+  phone: "",
+  role: "CLEANER",
+  password: "",
 };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    role: "CLEANER" as "CLEANER" | "COORDINATOR",
-    password: "",
-  });
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [form, setForm] = useState<UserForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
 
   async function load() {
     const res = await fetch("/api/users");
@@ -47,27 +61,56 @@ export default function UsersPage() {
     load();
   }, []);
 
+  function resetDialog() {
+    setEditingUser(null);
+    setForm(emptyForm);
+  }
+
+  function editUser(user: User) {
+    setEditingUser(user);
+    setForm({
+      name: user.name,
+      email: user.email ?? "",
+      phone: user.phone ?? "",
+      role: user.role,
+      password: "",
+    });
+    setOpen(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const res = await fetch("/api/users", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, active: true }),
-    });
-    if (res.ok) {
-      toast.success("User created");
-      setForm({
-        name: "",
-        email: "",
-        phone: "",
-        role: "CLEANER",
-        password: "",
-      });
+    setSaving(true);
+    const body = {
+      name: form.name,
+      email: form.email || null,
+      phone: form.phone || null,
+      role: form.role,
+      ...(form.password ? { password: form.password } : {}),
+      ...(!editingUser ? { active: true } : {}),
+    };
+
+    try {
+      const res = await fetch(
+        editingUser ? `/api/users/${editingUser.id}` : "/api/users",
+        {
+          method: editingUser ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Could not save user");
+        return;
+      }
+
+      toast.success(editingUser ? "User updated" : "User created");
       setOpen(false);
+      resetDialog();
       await load();
-    } else {
-      const data = await res.json();
-      toast.error(data.error || "Could not create");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -87,7 +130,13 @@ export default function UsersPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Users</h1>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(nextOpen) => {
+            setOpen(nextOpen);
+            if (!nextOpen) resetDialog();
+          }}
+        >
           <DialogTrigger asChild>
             <Button>
               <Plus className="size-4 mr-1" /> Add
@@ -95,7 +144,9 @@ export default function UsersPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create user</DialogTitle>
+              <DialogTitle>
+                {editingUser ? "Edit user" : "Create user"}
+              </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
@@ -120,6 +171,7 @@ export default function UsersPage() {
                 <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
+                  type="tel"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 />
@@ -130,7 +182,7 @@ export default function UsersPage() {
                   id="role"
                   value={form.role}
                   onChange={(e) =>
-                    setForm({ ...form, role: e.target.value as any })
+                    setForm({ ...form, role: e.target.value as Role })
                   }
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
@@ -139,19 +191,24 @@ export default function UsersPage() {
                 </select>
               </div>
               <div>
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">
+                  {editingUser ? "New password" : "Password"}
+                </Label>
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="new-password"
                   value={form.password}
                   onChange={(e) =>
                     setForm({ ...form, password: e.target.value })
                   }
-                  required
+                  minLength={6}
+                  required={!editingUser}
+                  placeholder={editingUser ? "Leave empty to keep current" : ""}
                 />
               </div>
-              <Button type="submit" className="w-full">
-                Create
+              <Button type="submit" className="w-full" disabled={saving}>
+                {saving ? "Saving..." : editingUser ? "Save changes" : "Create"}
               </Button>
             </form>
           </DialogContent>
@@ -162,23 +219,30 @@ export default function UsersPage() {
         <Skeleton className="h-48" />
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {users.map((u) => (
-            <div key={u.id} className="rounded-2xl border bg-card p-4">
-              <p className="text-lg font-bold">{u.name}</p>
-              <p className="text-sm text-muted-foreground">{u.role}</p>
-              <p className="text-sm">{u.email || u.phone}</p>
+          {users.map((user) => (
+            <div key={user.id} className="rounded-2xl border bg-card p-4">
+              <p className="text-lg font-bold">{user.name}</p>
+              <p className="text-sm text-muted-foreground">{user.role}</p>
+              <p className="text-sm">{user.email || user.phone}</p>
               <div className="mt-2 flex items-center gap-2">
                 <span
-                  className={`text-xs px-2 py-1 rounded-full ${u.active ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
+                  className={`text-xs px-2 py-1 rounded-full ${user.active ? "bg-emerald-100 text-emerald-700" : "bg-muted text-muted-foreground"}`}
                 >
-                  {u.active ? "Active" : "Inactive"}
+                  {user.active ? "Active" : "Inactive"}
                 </span>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => toggleActive(u)}
+                  onClick={() => editUser(user)}
                 >
-                  {u.active ? "Deactivate" : "Activate"}
+                  <Pencil className="size-4 mr-1" /> Edit
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => toggleActive(user)}
+                >
+                  {user.active ? "Deactivate" : "Activate"}
                 </Button>
               </div>
             </div>
