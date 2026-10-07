@@ -41,7 +41,10 @@ export const GET = withRole(
     if (!task) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json({ task });
+    return NextResponse.json({
+      task,
+      permissions: { canDelete: ctx.user.role === Role.COORDINATOR },
+    });
   },
 );
 
@@ -111,6 +114,20 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
 
 export const DELETE = withRole([Role.COORDINATOR], async (_req, ctx) => {
   const id = ctx.params?.id as string;
+  const task = await prisma.task.findUnique({
+    where: { id },
+    include: { apartment: true },
+  });
+  if (!task) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   await prisma.task.delete({ where: { id } });
+  await logAudit({
+    userId: ctx.user.userId,
+    action: "TASK_DELETED",
+    oldValue: task,
+  });
+
   return NextResponse.json({ ok: true });
 });

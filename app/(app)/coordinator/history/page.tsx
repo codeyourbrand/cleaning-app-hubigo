@@ -53,6 +53,7 @@ const ACTION_LABELS: Record<string, string> = {
   TASK_COMPLETED: "Task completed",
   TASK_STATUS_CHANGED: "Task status changed",
   TASK_EDITED: "Task edited",
+  TASK_DELETED: "Task deleted",
   STEP_COMPLETED: "Step completed",
   STEP_UNCOMPLETED: "Step uncompleted",
   COMMENT_CREATED: "Comment added",

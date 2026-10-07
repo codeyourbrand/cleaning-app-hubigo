@@ -16,6 +16,7 @@ import {
   X,
   Clock,
   Image as ImageIcon,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -95,6 +96,7 @@ function getTaskTypeLabel(type: string, customTypeName?: string | null) {
 
 function TaskDetail({ taskId }: { taskId: string }) {
   const [task, setTask] = useState<Task | null>(null);
+  const [canDelete, setCanDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -106,7 +108,9 @@ function TaskDetail({ taskId }: { taskId: string }) {
     try {
       const res = await fetch(`/api/tasks/${taskId}`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not load task");
       setTask(data.task);
+      setCanDelete(data.permissions?.canDelete === true);
     } catch {
       toast.error("Could not load task");
     } finally {
@@ -152,6 +156,23 @@ function TaskDetail({ taskId }: { taskId: string }) {
       const data = await res.json().catch(() => ({}));
       toast.error(data.error || "Could not complete");
     }
+    setBusy(false);
+  }
+
+  async function deleteTask() {
+    if (!confirm("Delete this task permanently?")) return;
+
+    setBusy(true);
+    const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+    if (res.ok) {
+      toast.success("Task deleted");
+      router.replace("/coordinator");
+      router.refresh();
+      return;
+    }
+
+    const data = await res.json().catch(() => ({}));
+    toast.error(data.error || "Could not delete task");
     setBusy(false);
   }
 
@@ -298,6 +319,18 @@ function TaskDetail({ taskId }: { taskId: string }) {
             {task.apartment.floor ? ` · Floor ${task.apartment.floor}` : ""}
           </Link>
         </div>
+        {canDelete && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={deleteTask}
+            disabled={busy}
+            className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+            aria-label="Delete task"
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        )}
       </div>
 
       {/* Photos at top */}
