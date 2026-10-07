@@ -184,9 +184,9 @@ export default function WhatsAppNotificationsPage() {
         </div>
         <div className="divide-y">
           {data.settings.map((setting) => (
-            <label
+            <div
               key={setting.eventType}
-              className="flex items-center justify-between px-4 py-3.5 cursor-pointer hover:bg-muted/50 transition-colors"
+              className="flex items-center justify-between px-4 py-3.5 hover:bg-muted/50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <EventIcon eventType={setting.eventType} />
@@ -209,7 +209,6 @@ export default function WhatsAppNotificationsPage() {
                       })
                     }
                     disabled={saving || !data.configured}
-                    onClick={(e) => e.preventDefault()}
                     className="h-8 rounded-md border border-input bg-background px-2 text-xs ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     {Object.entries(data.destinationLabels).map(
@@ -221,7 +220,7 @@ export default function WhatsAppNotificationsPage() {
                     )}
                   </select>
                 )}
-                <div className="relative">
+                <label className="relative cursor-pointer">
                   <input
                     type="checkbox"
                     className="sr-only peer"
@@ -235,9 +234,9 @@ export default function WhatsAppNotificationsPage() {
                   />
                   <div className="w-11 h-6 bg-muted rounded-full peer-checked:bg-green-600 transition-colors" />
                   <div className="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5" />
-                </div>
+                </label>
               </div>
-            </label>
+            </div>
           ))}
         </div>
       </div>
