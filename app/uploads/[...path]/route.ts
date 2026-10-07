@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { promises as fs } from "fs";
 import path from "path";
 import { verifySession } from "@/lib/auth";
+import { getSupabaseStorageConfig } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -37,25 +38,36 @@ export async function GET(
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
-  const uploadDir = getUploadDir();
-  const filePath = path.join(uploadDir, ...segments);
-  if (!filePath.startsWith(uploadDir + path.sep)) {
-    return NextResponse.json({ error: "Invalid path" }, { status: 400 });
-  }
+  const contentType =
+    contentTypes[path.extname(segments[segments.length - 1]).toLowerCase()] ??
+    "application/octet-stream";
 
   let data: Buffer;
-  try {
-    data = await fs.readFile(filePath);
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+  if (process.env.STORAGE_PROVIDER === "supabase") {
+    const { objectBase, headers } = getSupabaseStorageConfig();
+    const res = await fetch(`${objectBase}/${segments.join("/")}`, { headers });
+    if (res.status === 404 || res.status === 400) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    throw err;
+    if (!res.ok) {
+      throw new Error(`Storage download failed: ${res.status}`);
+    }
+    data = Buffer.from(await res.arrayBuffer());
+  } else {
+    const uploadDir = getUploadDir();
+    const filePath = path.join(uploadDir, ...segments);
+    if (!filePath.startsWith(uploadDir + path.sep)) {
+      return NextResponse.json({ error: "Invalid path" }, { status: 400 });
+    }
+    try {
+      data = await fs.readFile(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      throw err;
+    }
   }
-
-  const contentType =
-    contentTypes[path.extname(filePath).toLowerCase()] ??
-    "application/octet-stream";
 
   return new NextResponse(new Uint8Array(data), {
     headers: {

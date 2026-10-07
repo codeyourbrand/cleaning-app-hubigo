@@ -233,7 +233,7 @@ Hostfully reservations are matched by `externalHostfullyReservationId`. Duplicat
 
 Development uses local filesystem (`public/uploads`).
 
-Production set `STORAGE_PROVIDER=s3` and configure `S3_ENDPOINT`, `S3_REGION`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_PUBLIC_URL`.
+On hosts without a persistent disk (e.g. AWS Amplify) set `STORAGE_PROVIDER=supabase` and configure `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET` (a private bucket).
 
 ## Testing
 

@@ -76,6 +76,46 @@ class LocalStorageProvider implements StorageProvider {
   }
 }
 
+export function getSupabaseStorageConfig() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error("Supabase storage is missing required configuration");
+  }
+  return {
+    objectBase: `${url}/storage/v1/object/${process.env.SUPABASE_STORAGE_BUCKET ?? "uploads"}`,
+    headers: { Authorization: `Bearer ${key}`, apikey: key },
+  };
+}
+
+class SupabaseStorageProvider implements StorageProvider {
+  async put(
+    file: Buffer,
+    originalName: string,
+    contentType: string,
+  ): Promise<StoredFile> {
+    validateFile(file, contentType);
+    const key = generateKey(originalName);
+    const { objectBase, headers } = getSupabaseStorageConfig();
+    const res = await fetch(`${objectBase}/${key}`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": contentType },
+      body: new Uint8Array(file),
+    });
+    if (!res.ok) {
+      throw new Error(`Storage upload failed: ${res.status}`);
+    }
+    return { url: `/uploads/${key}`, key };
+  }
+
+  async delete(key: string): Promise<void> {
+    const { objectBase, headers } = getSupabaseStorageConfig();
+    await fetch(`${objectBase}/${key}`, { method: "DELETE", headers });
+  }
+}
+
 export async function getStorageProvider(): Promise<StorageProvider> {
-  return new LocalStorageProvider();
+  return process.env.STORAGE_PROVIDER === "supabase"
+    ? new SupabaseStorageProvider()
+    : new LocalStorageProvider();
 }
