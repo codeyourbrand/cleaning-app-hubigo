@@ -178,6 +178,15 @@ export default function CoordinatorDashboard() {
     );
   }
 
+  const visibleTasks = [...board.today, ...board.tomorrow, ...board.dayAfter];
+  const typeCounts = {
+    checkout: visibleTasks.filter((task) => task.type === "CHECK_OUT").length,
+    refresh: visibleTasks.filter((task) => task.type === "REFRESH").length,
+    other: visibleTasks.filter((task) =>
+      ["CLEANING", "REPAIR", "OTHER"].includes(task.type),
+    ).length,
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -218,21 +227,21 @@ export default function CoordinatorDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatCard
-          label="To do"
-          value={board.counts.todo}
-          color="bg-red-100 text-red-700"
+          label="Check-out"
+          value={typeCounts.checkout}
+          color="bg-slate-200 text-slate-800"
         />
         <StatCard
-          label="In progress"
-          value={board.counts.inProgress}
-          color="bg-amber-100 text-amber-700"
+          label="Refresh"
+          value={typeCounts.refresh}
+          color="bg-blue-100 text-blue-700"
         />
         <StatCard
-          label="Done"
-          value={board.counts.done}
-          color="bg-emerald-100 text-emerald-700"
+          label="Other"
+          value={typeCounts.other}
+          color="bg-fuchsia-100 text-fuchsia-700"
         />
       </div>
 
