@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { DEFAULT_TASK_STEPS } from "@/lib/task-steps";
 
 type Apartment = { id: string; number: string; building: string | null };
 type User = { id: string; name: string };
@@ -58,7 +59,7 @@ export default function NewTaskPage() {
     requests: "",
     instructions: "",
     assignedToUserId: "",
-    steps: "Kitchen\nBathroom\nBedrooms\nLiving room\nFloors\nFinal inspection",
+    steps: DEFAULT_TASK_STEPS.join("\n"),
   });
 
   useEffect(() => {

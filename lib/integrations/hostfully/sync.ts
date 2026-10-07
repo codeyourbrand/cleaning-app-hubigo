@@ -19,6 +19,7 @@ import {
   buildRefreshCreatedMessage,
 } from "@/lib/whatsapp";
 import { DEFAULT_APARTMENT_INVENTORY } from "@/lib/inventory-template";
+import { DEFAULT_TASK_STEPS } from "@/lib/task-steps";
 
 export const ACTIVE_STATUSES = new Set([
   "BOOKED",
@@ -408,6 +409,9 @@ async function processReservation(lead: HostfullyLead, ctx: SyncContext) {
       ...taskPayload,
       externalHostfullyReservationId: lead.uid,
       createdByUserId: ctx.coordinatorId,
+      steps: {
+        create: DEFAULT_TASK_STEPS.map((name, order) => ({ name, order })),
+      },
     },
     include: { apartment: true },
   });
@@ -499,6 +503,9 @@ async function generateRefreshTasks(
         guestsCount: mapped.guestsCount,
         nightsCount: mapped.nightsCount,
         createdByUserId: ctx.coordinatorId,
+        steps: {
+          create: DEFAULT_TASK_STEPS.map((name, order) => ({ name, order })),
+        },
       },
       include: { apartment: true },
     });
