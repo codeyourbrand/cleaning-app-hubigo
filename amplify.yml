@@ -34,7 +34,7 @@ frontend:
         - echo "NODE_ENV=$NODE_ENV" >> .env.production
         - echo "NEXT_TELEMETRY_DISABLED=$NEXT_TELEMETRY_DISABLED" >> .env.production
         - NODE_ENV=production npm run build
-        - rm -rf .next/cache .next/trace .next/diagnostics .next/types .next/trace-build .next/next-server.js.nft.json .next/next-minimal-server.js.nft.json
+        - rm -rf .next/cache .next/diagnostics .next/types .next/trace-build
         - find .next -name '*.map' -delete
         - du -sh .next
   artifacts:
