@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
 import path from "path";
 import { verifySession } from "@/lib/auth";
-import { getSupabaseStorageConfig } from "@/lib/storage";
+import { getStorageProvider } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -13,13 +12,6 @@ const contentTypes: Record<string, string> = {
   ".webp": "image/webp",
   ".heic": "image/heic",
 };
-
-function getUploadDir(): string {
-  const dir = process.env.LOCAL_UPLOAD_DIR ?? "uploads";
-  return path.isAbsolute(dir)
-    ? dir
-    : path.join(/*turbopackIgnore: true*/ process.cwd(), dir);
-}
 
 export async function GET(
   _req: NextRequest,
@@ -38,36 +30,14 @@ export async function GET(
     return NextResponse.json({ error: "Invalid path" }, { status: 400 });
   }
 
+  const data = await getStorageProvider().get(segments.join("/"));
+  if (!data) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const contentType =
     contentTypes[path.extname(segments[segments.length - 1]).toLowerCase()] ??
     "application/octet-stream";
-
-  let data: Buffer;
-  if (process.env.STORAGE_PROVIDER === "supabase") {
-    const { objectBase, headers } = getSupabaseStorageConfig();
-    const res = await fetch(`${objectBase}/${segments.join("/")}`, { headers });
-    if (res.status === 404 || res.status === 400) {
-      return NextResponse.json({ error: "Not found" }, { status: 404 });
-    }
-    if (!res.ok) {
-      throw new Error(`Storage download failed: ${res.status}`);
-    }
-    data = Buffer.from(await res.arrayBuffer());
-  } else {
-    const uploadDir = getUploadDir();
-    const filePath = path.join(uploadDir, ...segments);
-    if (!filePath.startsWith(uploadDir + path.sep)) {
-      return NextResponse.json({ error: "Invalid path" }, { status: 400 });
-    }
-    try {
-      data = await fs.readFile(filePath);
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
-      }
-      throw err;
-    }
-  }
 
   return new NextResponse(new Uint8Array(data), {
     headers: {

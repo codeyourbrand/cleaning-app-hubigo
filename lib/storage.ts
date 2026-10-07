@@ -1,6 +1,13 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  NoSuchKey,
+} from "@aws-sdk/client-s3";
 
 export interface StoredFile {
   url: string;
@@ -13,6 +20,7 @@ export interface StorageProvider {
     originalName: string,
     contentType: string,
   ): Promise<StoredFile>;
+  get(key: string): Promise<Buffer | null>;
   delete(key: string): Promise<void>;
 }
 
@@ -47,6 +55,12 @@ class LocalStorageProvider implements StorageProvider {
     this.publicBase = "/uploads";
   }
 
+  private resolveDir(): string {
+    return path.isAbsolute(this.uploadDir)
+      ? this.uploadDir
+      : path.join(/*turbopackIgnore: true*/ process.cwd(), this.uploadDir);
+  }
+
   async put(
     file: Buffer,
     originalName: string,
@@ -54,29 +68,77 @@ class LocalStorageProvider implements StorageProvider {
   ): Promise<StoredFile> {
     validateFile(file, contentType);
     const key = generateKey(originalName);
-    const dir = path.isAbsolute(this.uploadDir)
-      ? this.uploadDir
-      : path.join(/*turbopackIgnore: true*/ process.cwd(), this.uploadDir);
-    const dest = path.join(dir, key);
+    const dest = path.join(this.resolveDir(), key);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, file);
     return { url: `${this.publicBase}/${key}`, key };
   }
 
-  async delete(key: string): Promise<void> {
-    const dir = path.isAbsolute(this.uploadDir)
-      ? this.uploadDir
-      : path.join(/*turbopackIgnore: true*/ process.cwd(), this.uploadDir);
-    const dest = path.join(dir, key);
+  async get(key: string): Promise<Buffer | null> {
+    const dir = this.resolveDir();
+    const filePath = path.join(dir, key);
+    if (!filePath.startsWith(dir + path.sep)) return null;
     try {
-      await fs.unlink(dest);
+      return await fs.readFile(filePath);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw err;
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await fs.unlink(path.join(this.resolveDir(), key));
     } catch {
       // ignore missing file
     }
   }
 }
 
-export function getSupabaseStorageConfig() {
+class S3StorageProvider implements StorageProvider {
+  private client = new S3Client({
+    region: process.env.S3_REGION ?? "eu-central-1",
+  });
+  private bucket = process.env.S3_BUCKET ?? "";
+
+  async put(
+    file: Buffer,
+    originalName: string,
+    contentType: string,
+  ): Promise<StoredFile> {
+    validateFile(file, contentType);
+    const key = generateKey(originalName);
+    await this.client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: key,
+        Body: file,
+        ContentType: contentType,
+      }),
+    );
+    return { url: `/uploads/${key}`, key };
+  }
+
+  async get(key: string): Promise<Buffer | null> {
+    try {
+      const res = await this.client.send(
+        new GetObjectCommand({ Bucket: this.bucket, Key: key }),
+      );
+      return Buffer.from(await res.Body!.transformToByteArray());
+    } catch (err) {
+      if (err instanceof NoSuchKey) return null;
+      throw err;
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    await this.client.send(
+      new DeleteObjectCommand({ Bucket: this.bucket, Key: key }),
+    );
+  }
+}
+
+function getSupabaseStorageConfig() {
   const url = process.env.SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {
@@ -108,14 +170,32 @@ class SupabaseStorageProvider implements StorageProvider {
     return { url: `/uploads/${key}`, key };
   }
 
+  async get(key: string): Promise<Buffer | null> {
+    const { objectBase, headers } = getSupabaseStorageConfig();
+    const res = await fetch(`${objectBase}/${key}`, { headers });
+    if (res.status === 404 || res.status === 400) return null;
+    if (!res.ok) {
+      throw new Error(`Storage download failed: ${res.status}`);
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   async delete(key: string): Promise<void> {
     const { objectBase, headers } = getSupabaseStorageConfig();
     await fetch(`${objectBase}/${key}`, { method: "DELETE", headers });
   }
 }
 
-export async function getStorageProvider(): Promise<StorageProvider> {
-  return process.env.STORAGE_PROVIDER === "supabase"
-    ? new SupabaseStorageProvider()
-    : new LocalStorageProvider();
+export function getStorageProvider(): StorageProvider {
+  switch (process.env.STORAGE_PROVIDER) {
+    case "s3":
+      if (!process.env.S3_BUCKET) {
+        throw new Error("S3 storage is missing required configuration");
+      }
+      return new S3StorageProvider();
+    case "supabase":
+      return new SupabaseStorageProvider();
+    default:
+      return new LocalStorageProvider();
+  }
 }

@@ -31,7 +31,7 @@ export const POST = withRole(
     }
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const storage = await getStorageProvider();
+    const storage = getStorageProvider();
     const stored = await storage.put(bytes, file.name, file.type);
 
     const media = await prisma.media.create({

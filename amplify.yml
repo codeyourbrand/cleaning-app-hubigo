@@ -12,6 +12,8 @@ frontend:
         - echo "AUTH_SECRET=$AUTH_SECRET" >> .env.production
         - echo "NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL" >> .env.production
         - echo "STORAGE_PROVIDER=$STORAGE_PROVIDER" >> .env.production
+        - echo "S3_BUCKET=$S3_BUCKET" >> .env.production
+        - echo "S3_REGION=$S3_REGION" >> .env.production
         - echo "SUPABASE_URL=$SUPABASE_URL" >> .env.production
         - echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" >> .env.production
         - echo "SUPABASE_STORAGE_BUCKET=$SUPABASE_STORAGE_BUCKET" >> .env.production
