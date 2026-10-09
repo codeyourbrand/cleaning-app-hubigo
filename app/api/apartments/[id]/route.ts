@@ -67,15 +67,41 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
   }
 });
 
-export const DELETE = withRole([Role.COORDINATOR], async (_req, ctx) => {
+/**
+ * DELETE /api/apartments/:id[?force=true]
+ * An apartment with tasks is only deleted with force=true, which also removes
+ * its tasks (cascade). Without it the response carries the task count.
+ */
+export const DELETE = withRole([Role.COORDINATOR], async (req, ctx) => {
   const id = ctx.params?.id as string;
-  const count = await prisma.task.count({ where: { apartmentId: id } });
-  if (count > 0) {
+  const force = new URL(req.url).searchParams.get("force") === "true";
+
+  const apartment = await prisma.apartment.findUnique({
+    where: { id },
+    include: { _count: { select: { tasks: true } } },
+  });
+  if (!apartment) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const taskCount = apartment._count.tasks;
+  if (taskCount > 0 && !force) {
     return NextResponse.json(
-      { error: "Cannot delete apartment with existing tasks" },
+      { error: "Apartment has existing tasks", taskCount },
       { status: 409 },
     );
   }
+
   await prisma.apartment.delete({ where: { id } });
+  await logAudit({
+    userId: ctx.user.userId,
+    action: "APARTMENT_DELETED",
+    oldValue: {
+      id,
+      number: apartment.number,
+      building: apartment.building,
+      tasksDeleted: taskCount,
+    },
+  });
   return NextResponse.json({ ok: true });
 });

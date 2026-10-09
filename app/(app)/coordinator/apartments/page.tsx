@@ -88,15 +88,24 @@ export default function CoordinatorApartmentsPage() {
     }
   }
 
-  async function deleteApartment(id: string) {
-    const res = await fetch(`/api/apartments/${id}`, { method: "DELETE" });
+  async function deleteApartment(a: Apartment, force = false) {
+    const res = await fetch(`/api/apartments/${a.id}${force ? "?force=true" : ""}`, {
+      method: "DELETE",
+    });
     if (res.ok) {
       toast.success("Deleted");
       await load();
-    } else {
-      const data = await res.json();
-      toast.error(data.error || "Could not delete");
+      return;
     }
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.taskCount && !force) {
+      const confirmed = confirm(
+        `${a.number} has ${data.taskCount} task(s). Delete the apartment together with all its tasks? This cannot be undone.`,
+      );
+      if (confirmed) await deleteApartment(a, true);
+      return;
+    }
+    toast.error(data.error || "Could not delete");
   }
 
   const filtered = apartments.filter(
@@ -225,7 +234,7 @@ export default function CoordinatorApartmentsPage() {
                   <Pencil className="size-3" /> Edit
                 </button>
                 <button
-                  onClick={() => deleteApartment(a.id)}
+                  onClick={() => deleteApartment(a)}
                   className="flex-1 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors border-l"
                 >
                   Delete
