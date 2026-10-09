@@ -25,6 +25,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useMutationQueue } from "@/hooks/use-mutation-queue";
+import { taskStatusStyle } from "@/lib/task-status";
 
 export default function TaskPage({
   params,
@@ -278,12 +279,7 @@ function TaskDetail({ taskId }: { taskId: string }) {
     return <TaskSkeleton />;
   }
 
-  const statusBadge =
-    task.status === "DONE"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-      : task.status === "IN_PROGRESS"
-        ? "bg-amber-100 text-amber-700 border-amber-200"
-        : "bg-red-100 text-red-700 border-red-200";
+  const statusBadge = taskStatusStyle(task.status).badge;
 
   const allPhotos = task.media;
   const allStepsDone = task.steps.length > 0 && task.steps.every((s) => s.done);
@@ -381,7 +377,7 @@ function TaskDetail({ taskId }: { taskId: string }) {
         <div className="flex gap-4 mb-4 p-3 rounded-xl bg-muted/50">
           {task.startedAt && (
             <div className="flex items-center gap-2 text-sm">
-              <Clock className="size-4 text-amber-600" />
+              <Clock className="size-4 text-sky-600" />
               <span>Started: {formatDateTime(task.startedAt)}</span>
             </div>
           )}

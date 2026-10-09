@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOnlineStatus } from "@/hooks/use-online-status";
+import { taskStatusStyle } from "@/lib/task-status";
 
 type TaskWithApartment = {
   id: string;
@@ -212,12 +213,7 @@ export default function CleanerTasksPage() {
 }
 
 function TaskCard({ task }: { task: TaskWithApartment }) {
-  const statusColor =
-    task.status === "DONE"
-      ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-      : task.status === "IN_PROGRESS"
-        ? "bg-amber-100 text-amber-700 border-amber-200"
-        : "bg-red-100 text-red-700 border-red-200";
+  const statusColor = taskStatusStyle(task.status).badge;
 
   const typeLabel = getTaskTypeLabel(task.type, task.customTypeName);
 

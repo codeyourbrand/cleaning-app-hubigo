@@ -36,14 +36,17 @@ export const GET = withRole(
     });
 
     const taskSelect = {
-      orderBy: [{ status: "asc" as const }, { createdAt: "asc" as const }],
+      orderBy: [
+        { checkoutTime: { sort: "asc" as const, nulls: "last" as const } },
+        { createdAt: "asc" as const },
+      ],
       include: {
         apartment: { select: { id: true, number: true, building: true } },
         assignedTo: { select: { id: true, name: true } },
       },
     };
 
-    const [today, tomorrow, dayAfter, counts] = await Promise.all([
+    const [today, tomorrow, dayAfter, counts, cleaners] = await Promise.all([
       prisma.task.findMany({ where: days[0].where, ...taskSelect }),
       prisma.task.findMany({ where: days[1].where, ...taskSelect }),
       prisma.task.findMany({ where: days[2].where, ...taskSelect }),
@@ -58,6 +61,11 @@ export const GET = withRole(
         },
         _count: { status: true },
       }),
+      prisma.user.findMany({
+        where: { role: Role.CLEANER, active: true },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
     ]);
 
     const countsRaw = { TODO: 0, IN_PROGRESS: 0, DONE: 0 };
@@ -69,6 +77,7 @@ export const GET = withRole(
       today,
       tomorrow,
       dayAfter,
+      cleaners,
       counts: {
         todo: countsRaw.TODO,
         inProgress: countsRaw.IN_PROGRESS,
