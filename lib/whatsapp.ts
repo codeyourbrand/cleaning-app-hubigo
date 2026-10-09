@@ -7,6 +7,8 @@ const WHAPI_BASE_URL = "https://gate.whapi.cloud";
 export type WhatsAppEventType =
   | "TASK_CREATED"
   | "TASK_ASSIGNED"
+  | "TASK_TIMING_CHANGED"
+  | "TASK_COMMENTED"
   | "TASK_STARTED"
   | "TASK_COMPLETED"
   | "REFRESH_CREATED";
@@ -16,6 +18,8 @@ export type WhatsAppDestination = "GROUP" | "USER" | "BOTH";
 export const WHATSAPP_EVENT_LABELS: Record<WhatsAppEventType, string> = {
   TASK_CREATED: "New task created",
   TASK_ASSIGNED: "Person assigned to task",
+  TASK_TIMING_CHANGED: "Task time changed",
+  TASK_COMMENTED: "Comment added to task",
   TASK_STARTED: "Task started",
   TASK_COMPLETED: "Task completed",
   REFRESH_CREATED: "Refresh task auto-created",
@@ -199,6 +203,43 @@ export function buildTaskAssignedMessage(task: {
   const date = formatDateOnly(task.date);
   const schedule = formatTaskSchedule(task);
   return `👤 *${person}* assigned to:\n${name} — Apt ${apt}\nDate: ${date}${schedule ? `\n${schedule}` : ""}`;
+}
+
+export function buildTaskTimingChangedMessage(
+  task: {
+    title?: string | null;
+    type: string;
+    apartment?: { number: string } | null;
+    date: Date | string;
+    checkoutTime?: string | null;
+    checkinWindow?: string | null;
+  },
+  previousCheckoutTime?: string | null,
+): string {
+  const name = task.title || task.type;
+  const apt = task.apartment?.number ?? "?";
+  const date = formatDateOnly(task.date);
+  const next = task.checkoutTime ? `*${task.checkoutTime}*` : "_not set_";
+  const checkout = previousCheckoutTime
+    ? `Checkout: ~${previousCheckoutTime}~ → ${next}`
+    : `Checkout: ${next}`;
+  const checkin = task.checkinWindow ? `\nCheck-in: ${task.checkinWindow}` : "";
+  return `⚠️ *TIMING CHANGED* ⚠️\n${name} — Apt ${apt}\nDate: ${date}\n${checkout}${checkin}`;
+}
+
+export function buildTaskCommentedMessage(
+  task: {
+    title?: string | null;
+    type: string;
+    apartment?: { number: string } | null;
+  },
+  author: string,
+  body: string,
+): string {
+  const name = task.title || task.type;
+  const apt = task.apartment?.number ?? "?";
+  const excerpt = body.length > 300 ? `${body.slice(0, 300)}…` : body;
+  return `💬 *${author}* commented on:\n${name} — Apt ${apt}\n"${excerpt}"`;
 }
 
 export function buildTaskStartedMessage(task: {

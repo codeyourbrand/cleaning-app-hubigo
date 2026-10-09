@@ -18,6 +18,7 @@ export type AuditAction =
   | "USER_UPDATED"
   | "APARTMENT_CREATED"
   | "APARTMENT_UPDATED"
+  | "APARTMENT_DELETED"
   | "TASK_IMPORTED"
   | "HOSTFULLY_SYNC"
   | "INVENTORY_CHECKLIST_CREATED"
@@ -28,6 +29,7 @@ export type AuditAction =
   | "INVENTORY_ITEM_DELETED"
   | "INVENTORY_ITEM_CHECKED"
   | "INVENTORY_ITEM_UNCHECKED"
+  | "WHATSAPP_SENT"
   | "WHATSAPP_SKIPPED";
 
 /** Map actions to a category for filtering in the logs UI. */
@@ -46,6 +48,7 @@ const TASK_ACTIONS = new Set<string>([
   "COMMENT_CREATED",
   "PHOTO_ADDED",
   "TASK_IMPORTED",
+  "WHATSAPP_SENT",
 ]);
 const INVENTORY_ACTIONS = new Set<string>([
   "INVENTORY_CHECKLIST_CREATED",

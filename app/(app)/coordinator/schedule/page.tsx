@@ -10,11 +10,15 @@ import {
   Plus,
   X,
   Loader2,
+  MessageCircle,
+  CheckCheck,
+  TriangleAlert,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { getTaskNotifyState } from "@/lib/task-notify";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -34,6 +38,9 @@ type TaskRow = {
   instructions: string | null;
   apartment: { id: string; number: string; building: string | null };
   assignedTo: { id: string; name: string } | null;
+  whatsappSentAt: string | null;
+  whatsappSentToUserId: string | null;
+  whatsappSentCheckoutTime: string | null;
 };
 
 type Shift = {
@@ -163,6 +170,61 @@ function CellInput({
   );
 }
 
+const WHATSAPP_BUTTON = {
+  NO_ASSIGNEE: {
+    className: "cursor-not-allowed text-muted-foreground/40",
+    title: "Assign a cleaner first",
+    Icon: MessageCircle,
+  },
+  PENDING: {
+    className: "bg-emerald-500 text-white hover:bg-emerald-600",
+    title: "Send assignment on WhatsApp",
+    Icon: MessageCircle,
+  },
+  TIMING_CHANGED: {
+    className: "animate-pulse bg-amber-500 text-white hover:bg-amber-600",
+    title: "Time changed - send TIMING CHANGED on WhatsApp",
+    Icon: TriangleAlert,
+  },
+  SENT: {
+    className: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200",
+    title: "Sent - click to send again",
+    Icon: CheckCheck,
+  },
+} as const;
+
+function WhatsAppButton({
+  task,
+  sending,
+  onSend,
+}: {
+  task: TaskRow;
+  sending: boolean;
+  onSend: (resend: boolean) => void;
+}) {
+  const state = getTaskNotifyState(task);
+  const { className, title, Icon } = WHATSAPP_BUTTON[state];
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      disabled={state === "NO_ASSIGNEE" || sending}
+      onClick={() => {
+        if (state !== "SENT") return onSend(false);
+        if (confirm("Send the assignment on WhatsApp again?")) onSend(true);
+      }}
+      className={`mx-auto flex size-8 items-center justify-center rounded-full transition-colors ${className}`}
+    >
+      {sending ? (
+        <Loader2 className="size-4 animate-spin" />
+      ) : (
+        <Icon className="size-4" />
+      )}
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -240,6 +302,7 @@ function DailyView({
     assignedToUserId: "",
   });
   const [creatingTask, setCreatingTask] = useState(false);
+  const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
 
   const dateStr = fmtDate(date);
 
@@ -302,6 +365,26 @@ function DailyView({
     if (!res.ok) toast.error("Failed to save");
     if ("assignedToUserId" in patch || "apartmentId" in patch || !res.ok)
       load(true);
+  }
+
+  async function sendWhatsApp(task: TaskRow, resend: boolean) {
+    setSendingWhatsApp(task.id);
+    try {
+      const res = await fetch(
+        `/api/tasks/${task.id}/whatsapp${resend ? "?resend=true" : ""}`,
+        { method: "POST" },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) return toast.error(body.error || "Could not send WhatsApp");
+      toast.success(
+        body.kind === "TIMING_CHANGED"
+          ? "TIMING CHANGED sent"
+          : `Sent to ${task.assignedTo?.name}`,
+      );
+      load(true);
+    } finally {
+      setSendingWhatsApp(null);
+    }
   }
 
   async function removeTask(id: string) {
@@ -594,9 +677,15 @@ function DailyView({
 
       {/* Daily task table — editable, Excel-style */}
       <div className="overflow-x-auto">
-        <table className="min-w-[1300px] w-full border-collapse border border-black bg-white text-sm text-black">
+        <table className="min-w-[1360px] w-full border-collapse border border-black bg-white text-sm text-black">
           <thead>
             <tr>
+              <th
+                className="border border-black px-1 py-1 text-center w-12"
+                title="WhatsApp"
+              >
+                <MessageCircle className="mx-auto size-4 text-emerald-600" />
+              </th>
               <th className="border border-black px-2 py-1 text-center font-bold w-24">
                 Time
               </th>
@@ -634,7 +723,7 @@ function DailyView({
             {data.tasks.length === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={12}
                   className="border border-black px-3 py-8 text-center text-muted-foreground"
                 >
                   No tasks scheduled for this day.
@@ -648,6 +737,13 @@ function DailyView({
                   t.status === "DONE" ? "bg-emerald-50" : ""
                 }`}
               >
+                <td className="border border-black px-1 py-1">
+                  <WhatsAppButton
+                    task={t}
+                    sending={sendingWhatsApp === t.id}
+                    onSend={(resend) => sendWhatsApp(t, resend)}
+                  />
+                </td>
                 <td className="border border-black px-1 py-1">
                   <CellInput
                     type="time"
@@ -779,7 +875,7 @@ function DailyView({
               .map((n) => (
                 <tr key={n.id}>
                   <td
-                    colSpan={10}
+                    colSpan={11}
                     className="border border-black py-2 text-center font-bold"
                   >
                     {n.note}
@@ -796,6 +892,7 @@ function DailyView({
                 </tr>
               ))}
             <tr className="bg-slate-50">
+              <td className="border border-black px-1 py-2" />
               <td className="border border-black px-1 py-2">
                 <input
                   type="time"

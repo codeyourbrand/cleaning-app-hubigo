@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import {
   AlertCircle,
   CheckCircle2,
+  Clock,
   MessageSquare,
   Play,
   Plus,
@@ -281,6 +282,12 @@ function EventIcon({ eventType }: { eventType: string }) {
           <UserRound className="size-5" strokeWidth={2.25} />
         </div>
       );
+    case "TASK_TIMING_CHANGED":
+      return (
+        <div className={`${base} bg-orange-500`}>
+          <Clock className="size-5" strokeWidth={2.25} />
+        </div>
+      );
     case "TASK_STARTED":
       return (
         <div className={`${base} bg-amber-500`}>
@@ -299,6 +306,12 @@ function EventIcon({ eventType }: { eventType: string }) {
           <RefreshCw className="size-5" strokeWidth={2.25} />
         </div>
       );
+    case "TASK_COMMENTED":
+      return (
+        <div className={`${base} bg-pink-500`}>
+          <MessageSquare className="size-5" strokeWidth={2.25} />
+        </div>
+      );
     default:
       return (
         <div className={`${base} bg-gray-500`}>
@@ -313,7 +326,11 @@ function eventDescription(eventType: string): string {
     case "TASK_CREATED":
       return "When a new task is created (manual or Hostfully checkout)";
     case "TASK_ASSIGNED":
-      return "When a cleaner is assigned to a task";
+      return "Sent to the cleaner when the coordinator clicks the WhatsApp button in the schedule";
+    case "TASK_TIMING_CHANGED":
+      return "Sent to the cleaner (marked TIMING CHANGED) when the time is edited after the assignment was sent";
+    case "TASK_COMMENTED":
+      return "When a comment is added to a task (coordinator comments go to the assigned cleaner)";
     case "TASK_STARTED":
       return "When a cleaner starts working on a task";
     case "TASK_COMPLETED":

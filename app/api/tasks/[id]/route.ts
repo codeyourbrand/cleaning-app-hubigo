@@ -4,10 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { taskUpdateSchema } from "@/lib/schemas";
 import { Role } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
-import {
-  sendWhatsAppNotification,
-  buildTaskAssignedMessage,
-} from "@/lib/whatsapp";
 
 export const GET = withRole(
   [Role.CLEANER, Role.COORDINATOR],
@@ -83,31 +79,6 @@ export const PATCH = withRole([Role.COORDINATOR], async (req, ctx) => {
     oldValue: oldTask,
     newValue: task,
   });
-
-  // WhatsApp notification when someone gets assigned
-  if (
-    data.assignedToUserId &&
-    data.assignedToUserId !== oldTask.assignedToUserId
-  ) {
-    const fullTask = await prisma.task.findUnique({
-      where: { id },
-      include: {
-        apartment: true,
-        assignedTo: { select: { name: true, phone: true } },
-      },
-    });
-    if (fullTask) {
-      sendWhatsAppNotification(
-        "TASK_ASSIGNED",
-        buildTaskAssignedMessage(fullTask),
-        {
-          actorUserId: ctx.user.userId,
-          taskId: id,
-          recipient: fullTask.assignedTo,
-        },
-      ).catch(() => {});
-    }
-  }
 
   return NextResponse.json({ task });
 });

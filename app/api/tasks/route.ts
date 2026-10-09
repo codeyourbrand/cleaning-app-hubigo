@@ -8,7 +8,6 @@ import { startOfDay, endOfDay, parseISO } from "date-fns";
 import {
   sendWhatsAppNotification,
   buildTaskCreatedMessage,
-  buildTaskAssignedMessage,
 } from "@/lib/whatsapp";
 
 export const GET = withRole(
@@ -116,35 +115,17 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
     });
   }
 
-  // WhatsApp notifications (fire-and-forget)
+  // Group notification only (fire-and-forget). The assigned cleaner is messaged
+  // later, when the coordinator confirms via POST /api/tasks/:id/whatsapp.
   const fullTask = await prisma.task.findUnique({
     where: { id: task.id },
-    include: {
-      apartment: true,
-      assignedTo: { select: { name: true, phone: true } },
-    },
+    include: { apartment: true },
   });
   if (fullTask) {
     sendWhatsAppNotification(
       "TASK_CREATED",
       buildTaskCreatedMessage(fullTask),
-      {
-        actorUserId: ctx.user.userId,
-        taskId: task.id,
-        recipient: fullTask.assignedTo,
-      },
     ).catch(() => {});
-    if (assignedToUserId) {
-      sendWhatsAppNotification(
-        "TASK_ASSIGNED",
-        buildTaskAssignedMessage(fullTask),
-        {
-          actorUserId: ctx.user.userId,
-          taskId: task.id,
-          recipient: fullTask.assignedTo,
-        },
-      ).catch(() => {});
-    }
   }
 
   return NextResponse.json({ task }, { status: 201 });
