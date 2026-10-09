@@ -26,40 +26,25 @@ export const GET = withRole(
 
     const days = [0, 1, 2].map((offset) => {
       const date = addDays(new Date(), offset);
-      return {
-        date,
-        where: {
-          ...baseWhere,
-          date: { gte: startOfDay(date), lte: endOfDay(date) },
-        },
-      };
+      return { start: startOfDay(date), end: endOfDay(date) };
     });
 
-    const taskSelect = {
-      orderBy: [
-        { checkoutTime: { sort: "asc" as const, nulls: "last" as const } },
-        { createdAt: "asc" as const },
-      ],
-      include: {
-        apartment: { select: { id: true, number: true, building: true } },
-        assignedTo: { select: { id: true, name: true } },
-      },
-    };
-
-    const [today, tomorrow, dayAfter, counts, cleaners] = await Promise.all([
-      prisma.task.findMany({ where: days[0].where, ...taskSelect }),
-      prisma.task.findMany({ where: days[1].where, ...taskSelect }),
-      prisma.task.findMany({ where: days[2].where, ...taskSelect }),
-      prisma.task.groupBy({
-        by: ["status"],
+    // One query for the whole range (each query is a database round trip),
+    // split into days afterwards. The order is preserved within each day.
+    const [tasks, cleaners] = await Promise.all([
+      prisma.task.findMany({
         where: {
-          date: {
-            gte: startOfDay(new Date()),
-            lte: endOfDay(addDays(new Date(), 2)),
-          },
           ...baseWhere,
+          date: { gte: days[0].start, lte: days[2].end },
         },
-        _count: { status: true },
+        orderBy: [
+          { checkoutTime: { sort: "asc", nulls: "last" } },
+          { createdAt: "asc" },
+        ],
+        include: {
+          apartment: { select: { id: true, number: true, building: true } },
+          assignedTo: { select: { id: true, name: true } },
+        },
       }),
       prisma.user.findMany({
         where: { role: Role.CLEANER, active: true },
@@ -68,10 +53,9 @@ export const GET = withRole(
       }),
     ]);
 
-    const countsRaw = { TODO: 0, IN_PROGRESS: 0, DONE: 0 };
-    for (const group of counts) {
-      countsRaw[group.status as keyof typeof countsRaw] = group._count.status;
-    }
+    const [today, tomorrow, dayAfter] = days.map((day) =>
+      tasks.filter((t) => t.date >= day.start && t.date <= day.end),
+    );
 
     return NextResponse.json({
       today,
@@ -79,9 +63,9 @@ export const GET = withRole(
       dayAfter,
       cleaners,
       counts: {
-        todo: countsRaw.TODO,
-        inProgress: countsRaw.IN_PROGRESS,
-        done: countsRaw.DONE,
+        todo: tasks.filter((t) => t.status === "TODO").length,
+        inProgress: tasks.filter((t) => t.status === "IN_PROGRESS").length,
+        done: tasks.filter((t) => t.status === "DONE").length,
       },
     });
   },
