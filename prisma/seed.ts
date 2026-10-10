@@ -125,9 +125,9 @@ async function main() {
         nightsCount: data.nightsCount,
         requests: data.requests,
         instructions: data.instructions,
-        assignedToUserId: data.assignedToUserId,
         createdByUserId: coordinator.id,
         externalHostfullyReservationId: `seed-${data.apartmentId}-${today.toISOString().split("T")[0]}`,
+        assignedTo: { create: { userId: data.assignedToUserId } },
         steps: {
           create: steps.map((name, idx) => ({ name, order: idx })),
         },

@@ -98,13 +98,17 @@ export default function CoordinatorLayout({
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="hidden md:flex w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground p-4 sticky top-0 h-screen overflow-y-auto">
         <div className="mb-8 px-2 pt-2">
-          <HubigoLogo />
+          <Link href="/coordinator" className="inline-block">
+            <HubigoLogo />
+          </Link>
         </div>
         {Nav}
       </aside>
 
       <header className="md:hidden sticky top-0 z-40 flex items-center justify-between bg-sidebar text-sidebar-foreground px-4 py-3">
-        <HubigoLogo markClassName="size-8" />
+        <Link href="/coordinator" className="inline-block">
+          <HubigoLogo markClassName="size-8" />
+        </Link>
         <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
           <SheetTrigger asChild>
             <Button
@@ -121,7 +125,9 @@ export default function CoordinatorLayout({
             className="w-64 flex flex-col bg-sidebar text-sidebar-foreground border-sidebar-border p-4"
           >
             <div className="mb-6 px-2">
-              <HubigoLogo />
+              <Link href="/coordinator" className="inline-block">
+                <HubigoLogo />
+              </Link>
             </div>
             {Nav}
           </SheetContent>

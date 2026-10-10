@@ -3,10 +3,12 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { format, addDays } from "date-fns";
-import { ChevronDown, Clock, UserRound } from "lucide-react";
+import { UserRound } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { taskStatusStyle } from "@/lib/task-status";
+import { InlineTimeInput } from "@/components/inline-time-input";
+import { CleanerMultiSelect } from "@/components/cleaner-multi-select";
 import { toast } from "sonner";
 
 type Cleaner = { id: string; name: string };
@@ -18,7 +20,7 @@ type TaskSummary = {
   type: string;
   customTypeName: string | null;
   apartment: { number: string; building: string | null };
-  assignedTo: Cleaner | null;
+  assignedTo: Cleaner[];
   checkoutTime: string | null;
 };
 
@@ -121,7 +123,6 @@ export default function CoordinatorDashboard() {
       return;
     }
 
-    // Optimistic: move the task between columns
     const columnKeys: Record<
       string,
       keyof Pick<Board, "today" | "tomorrow" | "dayAfter">
@@ -138,7 +139,6 @@ export default function CoordinatorDashboard() {
     const task = board[fromKey].find((t) => t.id === taskId);
     if (!task) return;
 
-    // Calculate the new date
     const dateOffsets: Record<string, number> = {
       today: 0,
       tomorrow: 1,
@@ -166,34 +166,62 @@ export default function CoordinatorDashboard() {
       });
       if (!res.ok) {
         toast.error("Could not move task");
-        loadBoard(); // revert
+        loadBoard();
       }
     } catch {
       toast.error("Could not move task");
-      loadBoard(); // revert
+      loadBoard();
     }
   }
 
-  async function assignTask(taskId: string, userId: string) {
+  async function assignTask(taskId: string, userIds: string[]) {
     if (!board) return;
-    const cleaner = board.cleaners.find((c) => c.id === userId) ?? null;
+    const selected = board.cleaners.filter((c) => userIds.includes(c.id));
     setBoard(
-      mapTasks(board, (t) => (t.id === taskId ? { ...t, assignedTo: cleaner } : t)),
+      mapTasks(board, (t) =>
+        t.id === taskId ? { ...t, assignedTo: selected } : t,
+      ),
     );
     try {
       const res = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assignedToUserId: userId || null }),
+        body: JSON.stringify({ assignedToUserIds: userIds }),
       });
       if (!res.ok) throw new Error();
-      toast.success(cleaner ? `Assigned to ${cleaner.name}` : "Unassigned", {
-        description: cleaner
-          ? "WhatsApp is sent from the Schedule page"
-          : undefined,
-      });
+      toast.success(
+        selected.length > 0
+          ? `Assigned to ${selected.map((c) => c.name).join(", ")}`
+          : "Unassigned",
+        {
+          description:
+            selected.length > 0
+              ? "WhatsApp is sent from the Schedule page"
+              : undefined,
+        },
+      );
     } catch {
-      toast.error("Could not assign cleaner");
+      toast.error("Could not assign cleaners");
+      loadBoard();
+    }
+  }
+
+  async function updateTime(taskId: string, time: string | null) {
+    if (!board) return;
+    setBoard(
+      mapTasks(board, (t) =>
+        t.id === taskId ? { ...t, checkoutTime: time } : t,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checkoutTime: time }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      toast.error("Could not update time");
       loadBoard();
     }
   }
@@ -291,6 +319,7 @@ export default function CoordinatorDashboard() {
           columnId="today"
           cleaners={board.cleaners}
           onAssign={assignTask}
+          onUpdateTime={updateTime}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -302,6 +331,7 @@ export default function CoordinatorDashboard() {
           columnId="tomorrow"
           cleaners={board.cleaners}
           onAssign={assignTask}
+          onUpdateTime={updateTime}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -313,6 +343,7 @@ export default function CoordinatorDashboard() {
           columnId="dayAfter"
           cleaners={board.cleaners}
           onAssign={assignTask}
+          onUpdateTime={updateTime}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
@@ -346,6 +377,7 @@ function Column({
   columnId,
   cleaners,
   onAssign,
+  onUpdateTime,
   onDragStart,
   onDragOver,
   onDrop,
@@ -355,7 +387,8 @@ function Column({
   tasks: TaskSummary[];
   columnId: string;
   cleaners: Cleaner[];
-  onAssign: (taskId: string, userId: string) => void;
+  onAssign: (taskId: string, userIds: string[]) => void;
+  onUpdateTime: (taskId: string, time: string | null) => void;
   onDragStart: (taskId: string, fromColumn: string) => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (toColumn: string) => void;
@@ -400,6 +433,7 @@ function Column({
             columnId={columnId}
             cleaners={cleaners}
             onAssign={onAssign}
+            onUpdateTime={onUpdateTime}
             onDragStart={onDragStart}
           />
         ))}
@@ -413,16 +447,18 @@ function TaskTile({
   columnId,
   cleaners,
   onAssign,
+  onUpdateTime,
   onDragStart,
 }: {
   task: TaskSummary;
   columnId: string;
   cleaners: Cleaner[];
-  onAssign: (taskId: string, userId: string) => void;
+  onAssign: (taskId: string, userIds: string[]) => void;
+  onUpdateTime: (taskId: string, time: string | null) => void;
   onDragStart: (taskId: string, fromColumn: string) => void;
 }) {
   const status = taskStatusStyle(task.status);
-  const assignedId = task.assignedTo?.id ?? "";
+  const assignedNames = task.assignedTo.map((c) => c.name).join(", ");
 
   return (
     <div
@@ -436,10 +472,10 @@ function TaskTile({
       <span className={`absolute inset-y-0 left-0 w-1.5 ${status.accent}`} />
       <Link href={`/tasks/${task.id}`} className="block py-3 pl-5 pr-3">
         <div className="flex items-center justify-between gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-white/80 px-2 py-1 text-sm font-semibold tabular-nums shadow-sm">
-            <Clock className="size-3.5 text-muted-foreground" />
-            {task.checkoutTime ?? "--:--"}
-          </span>
+          <InlineTimeInput
+            value={task.checkoutTime}
+            onSave={(v) => onUpdateTime(task.id, v)}
+          />
           <Badge className={status.badge} variant="outline">
             {status.label}
           </Badge>
@@ -448,35 +484,38 @@ function TaskTile({
           {task.apartment.number}
         </p>
         <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-          <span className={`size-2 shrink-0 rounded-full ${typeDot(task.type)}`} />
+          <span
+            className={`size-2 shrink-0 rounded-full ${typeDot(task.type)}`}
+          />
           <span className="truncate">
             {task.title || getTaskTypeLabel(task.type, task.customTypeName)}
           </span>
         </p>
       </Link>
-      <label className="flex items-center gap-2 border-t border-inherit bg-white/60 py-2 pl-5 pr-3">
-        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
-          <UserRound
-            className={`size-3.5 ${task.assignedTo ? "text-foreground" : "text-muted-foreground"}`}
-          />
-        </span>
-        <select
-          aria-label="Assign cleaner"
-          value={assignedId}
-          onChange={(e) => onAssign(task.id, e.target.value)}
-          className={`min-w-0 flex-1 cursor-pointer appearance-none truncate bg-transparent text-sm focus:outline-none ${
-            task.assignedTo ? "font-medium" : "italic text-muted-foreground"
-          }`}
-        >
-          <option value="">Assign cleaner</option>
-          {cleaners.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
-      </label>
+      <div className="border-t border-inherit bg-white/60 py-2 pl-5 pr-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+            <UserRound
+              className={`size-3.5 ${task.assignedTo.length > 0 ? "text-foreground" : "text-muted-foreground"}`}
+            />
+          </span>
+          <span
+            className={`text-sm truncate ${
+              task.assignedTo.length > 0
+                ? "font-medium"
+                : "italic text-muted-foreground"
+            }`}
+          >
+            {assignedNames || "Unassigned"}
+          </span>
+        </div>
+        <CleanerMultiSelect
+          cleaners={cleaners}
+          selected={task.assignedTo.map((c) => c.id)}
+          onChange={(ids) => onAssign(task.id, ids)}
+          placeholder="Assign cleaners"
+        />
+      </div>
     </div>
   );
 }

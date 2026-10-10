@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useMutationQueue } from "@/hooks/use-mutation-queue";
 import { taskStatusStyle } from "@/lib/task-status";
+import { CleanerMultiSelect } from "@/components/cleaner-multi-select";
 
 export default function TaskPage({
   params,
@@ -70,7 +71,7 @@ type Task = {
     building: string | null;
     floor: string | null;
   };
-  assignedTo: { id: string; name: string } | null;
+  assignedTo: { id: string; name: string }[];
   startedAt?: string;
   doneAt?: string;
   steps: Step[];
@@ -100,6 +101,12 @@ function TaskDetail({ taskId }: { taskId: string }) {
   const [canDelete, setCanDelete] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [cleaners, setCleaners] = useState<{ id: string; name: string }[]>([]);
+  const [editing, setEditing] = useState(false);
+  const [editedAssignedTo, setEditedAssignedTo] = useState<string[]>([]);
+  const [editedCheckoutTime, setEditedCheckoutTime] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [loadingCleaners, setLoadingCleaners] = useState(false);
   const router = useRouter();
   const online = useOnlineStatus();
   const { queueMutation } = useMutationQueue();
@@ -123,6 +130,52 @@ function TaskDetail({ taskId }: { taskId: string }) {
     setLoading(true);
     loadTask();
   }, [loadTask]);
+
+  async function enterEditMode() {
+    if (!task) return;
+    setLoadingCleaners(true);
+    try {
+      const res = await fetch("/api/users");
+      const data = await res.json().catch(() => ({}));
+      setCleaners(
+        (data.users ?? []).filter(
+          (u: { role: string }) => u.role === "CLEANER",
+        ),
+      );
+    } catch {
+      toast.error("Could not load cleaners");
+    } finally {
+      setLoadingCleaners(false);
+    }
+    setEditedAssignedTo(task.assignedTo.map((a) => a.id));
+    setEditedCheckoutTime(task.checkoutTime ?? "");
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!task) return;
+    setSavingEdit(true);
+    try {
+      const payload: Record<string, unknown> = {
+        assignedToUserIds: editedAssignedTo,
+      };
+      const trimmedTime = editedCheckoutTime.trim();
+      payload.checkoutTime = trimmedTime === "" ? null : trimmedTime;
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Saved");
+      setEditing(false);
+      await loadTask();
+    } catch {
+      toast.error("Could not save changes");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   async function startTask() {
     setBusy(true);
@@ -367,10 +420,73 @@ function TaskDetail({ taskId }: { taskId: string }) {
         />
       </Section>
 
-      <div className="space-y-1 text-sm text-muted-foreground mb-4">
-        <p>Type: {typeLabel}</p>
-        {task.assignedTo && <p>Assigned to: {task.assignedTo.name}</p>}
-      </div>
+      <Section title="Assignment & time">
+        {editing ? (
+          <div className="space-y-3">
+            {loadingCleaners ? (
+              <p className="text-sm text-muted-foreground">Loading cleaners…</p>
+            ) : (
+              <div>
+                <p className="text-sm font-medium mb-1.5">Assigned cleaners</p>
+                <CleanerMultiSelect
+                  cleaners={cleaners}
+                  selected={editedAssignedTo}
+                  onChange={setEditedAssignedTo}
+                  placeholder="Unassigned"
+                />
+              </div>
+            )}
+            <div>
+              <p className="text-sm font-medium mb-1.5">Checkout time</p>
+              <Input
+                type="time"
+                value={editedCheckoutTime}
+                onChange={(e) => setEditedCheckoutTime(e.target.value)}
+                className="w-32"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={saveEdit}
+                disabled={savingEdit || loadingCleaners}
+              >
+                {savingEdit ? "Saving…" : "Save"}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditedAssignedTo(task.assignedTo.map((a) => a.id));
+                  setEditedCheckoutTime(task.checkoutTime ?? "");
+                  setEditing(false);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">Type: {typeLabel}</p>
+              <Button size="sm" variant="outline" onClick={enterEditMode}>
+                Edit
+              </Button>
+            </div>
+            <p className="text-sm">
+              <span className="text-muted-foreground">Assigned to:</span>{" "}
+              {task.assignedTo.length > 0
+                ? task.assignedTo.map((a) => a.name).join(", ")
+                : "Unassigned"}
+            </p>
+            <p className="text-sm">
+              <span className="text-muted-foreground">Checkout time:</span>{" "}
+              {task.checkoutTime ?? "—"}
+            </p>
+          </div>
+        )}
+      </Section>
 
       {/* Cleaning times */}
       {(task.startedAt || task.doneAt) && (

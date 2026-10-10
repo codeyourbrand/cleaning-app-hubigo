@@ -34,7 +34,9 @@ async function dailySchedule(date: Date) {
       orderBy: [{ checkoutTime: "asc" }, { createdAt: "asc" }],
       include: {
         apartment: { select: { id: true, number: true, building: true } },
-        assignedTo: { select: { id: true, name: true } },
+        assignedTo: {
+          include: { user: { select: { id: true, name: true } } },
+        },
       },
     }),
     prisma.cleanerShift.findMany({
@@ -52,7 +54,23 @@ async function dailySchedule(date: Date) {
     }),
   ]);
 
-  return NextResponse.json({ tasks, shifts, notes, cleaners, date: dayStart });
+  const mappedTasks = tasks.map((t) => ({
+    ...t,
+    assignedTo: t.assignedTo.map((a) => ({
+      id: a.userId,
+      name: a.user.name,
+      whatsappSentAt: a.whatsappSentAt,
+      whatsappSentCheckoutTime: a.whatsappSentCheckoutTime,
+    })),
+  }));
+
+  return NextResponse.json({
+    tasks: mappedTasks,
+    shifts,
+    notes,
+    cleaners,
+    date: dayStart,
+  });
 }
 
 async function weeklySchedule(weekDate: string) {
@@ -71,7 +89,9 @@ async function weeklySchedule(weekDate: string) {
       orderBy: [{ date: "asc" }, { checkoutTime: "asc" }],
       include: {
         apartment: { select: { id: true, number: true, building: true } },
-        assignedTo: { select: { id: true, name: true } },
+        assignedTo: {
+          include: { user: { select: { id: true, name: true } } },
+        },
       },
     }),
     prisma.user.findMany({
@@ -85,6 +105,16 @@ async function weeklySchedule(weekDate: string) {
     }),
   ]);
 
+  const mappedTasks = tasks.map((t) => ({
+    ...t,
+    assignedTo: t.assignedTo.map((a) => ({
+      id: a.userId,
+      name: a.user.name,
+      whatsappSentAt: a.whatsappSentAt,
+      whatsappSentCheckoutTime: a.whatsappSentCheckoutTime,
+    })),
+  }));
+
   // Build 7-day array
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(weekStart, i);
@@ -95,12 +125,10 @@ async function weeklySchedule(weekDate: string) {
       shifts: shifts.filter(
         (s) => s.date.toISOString().slice(0, 10) === dateStr,
       ),
-      tasks: tasks.filter(
+      tasks: mappedTasks.filter(
         (t) => t.date.toISOString().slice(0, 10) === dateStr,
       ),
-      notes: notes.filter(
-        (n) => n.date.toISOString().slice(0, 10) === dateStr,
-      ),
+      notes: notes.filter((n) => n.date.toISOString().slice(0, 10) === dateStr),
     };
   });
 

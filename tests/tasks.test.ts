@@ -25,7 +25,7 @@ describe("tasks", () => {
         type: TaskType.CLEANING,
         status: TaskStatus.TODO,
         createdByUserId: user.id,
-        assignedToUserId: user.id,
+        assignedTo: { create: { userId: user.id } },
         steps: { create: [{ name: "Kitchen", order: 0 }] },
       },
       include: { steps: true },

@@ -45,7 +45,7 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  assignedTasks   Task[]        @relation("AssignedTasks")
+  taskAssignments TaskAssignedCleaner[]
   createdTasks    Task[]        @relation("CreatedTasks")
   startedTasks    Task[]        @relation("StartedTasks")
   doneTasks       Task[]        @relation("DoneTasks")
@@ -100,7 +100,6 @@ model Task {
   nightsCount                   Int?       @map("nights_count")
   requests                      String?
   instructions                  String?
-  assignedToUserId              String?    @map("assigned_to_user_id")
   createdByUserId               String     @map("created_by_user_id")
   doneAt                        DateTime?  @map("done_at")
   doneByUserId                  String?    @map("done_by_user_id")
@@ -109,13 +108,10 @@ model Task {
   createdAt                     DateTime   @default(now())
   updatedAt                     DateTime   @updatedAt
   externalHostfullyReservationId String?   @unique @map("external_hostfully_reservation_id")
-  whatsappSentAt                DateTime?  @map("whatsapp_sent_at")
-  whatsappSentToUserId          String?    @map("whatsapp_sent_to_user_id")
-  whatsappSentCheckoutTime      String?    @map("whatsapp_sent_checkout_time")
 
-  apartment    Apartment    @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
-  assignedTo   User?        @relation("AssignedTasks", fields: [assignedToUserId], references: [id], onDelete: SetNull)
-  createdBy    User         @relation("CreatedTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  apartment    Apartment         @relation(fields: [apartmentId], references: [id], onDelete: Cascade)
+  assignedTo   TaskAssignedCleaner[]
+  createdBy    User              @relation("CreatedTasks", fields: [createdByUserId], references: [id], onDelete: Cascade)
   startedBy    User?        @relation("StartedTasks", fields: [startedByUserId], references: [id], onDelete: SetNull)
   doneBy       User?        @relation("DoneTasks", fields: [doneByUserId], references: [id], onDelete: SetNull)
   steps        TaskStep[]
@@ -126,10 +122,26 @@ model Task {
 
   @@index([date])
   @@index([status])
-  @@index([assignedToUserId])
   @@index([apartmentId])
   @@index([date, status])
   @@map("tasks")
+}
+
+model TaskAssignedCleaner {
+  id                       String    @id @default(cuid())
+  taskId                   String    @map("task_id")
+  userId                   String    @map("user_id")
+  whatsappSentAt           DateTime? @map("whatsapp_sent_at")
+  whatsappSentCheckoutTime String?   @map("whatsapp_sent_checkout_time")
+  createdAt                DateTime  @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+  @@map("task_assigned_cleaners")
 }
 
 model TaskStep {

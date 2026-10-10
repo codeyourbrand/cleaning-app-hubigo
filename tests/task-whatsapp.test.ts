@@ -41,7 +41,7 @@ async function seed({ phone }: { phone: string | null }) {
       type: TaskType.CHECK_OUT,
       checkoutTime: "11:00",
       createdByUserId: coordinator.id,
-      assignedToUserId: cleaner.id,
+      assignedTo: { create: { userId: cleaner.id } },
     },
   });
   vi.mocked(verifySession).mockResolvedValue({
@@ -63,6 +63,7 @@ function send(taskId: string, query = "") {
 
 beforeEach(async () => {
   await prisma.auditLog.deleteMany();
+  await prisma.taskAssignedCleaner.deleteMany();
   await prisma.task.deleteMany();
   await prisma.apartment.deleteMany();
   await prisma.user.deleteMany();
@@ -85,10 +86,7 @@ afterEach(() => {
 describe("POST /api/tasks/:id/whatsapp", () => {
   it("refuses a task with nobody assigned", async () => {
     const { task } = await seed({ phone: "+971 58 590 1656" });
-    await prisma.task.update({
-      where: { id: task.id },
-      data: { assignedToUserId: null },
-    });
+    await prisma.taskAssignedCleaner.deleteMany({ where: { taskId: task.id } });
 
     const res = await send(task.id);
 
@@ -96,12 +94,12 @@ describe("POST /api/tasks/:id/whatsapp", () => {
     expect(whapi).not.toHaveBeenCalled();
   });
 
-  it("refuses when the cleaner has no phone number", async () => {
+  it("refuses when the cleaners have no phone numbers", async () => {
     const { task } = await seed({ phone: null });
 
     const res = await send(task.id);
 
-    expect(res.status).toBe(422);
+    expect(res.status).toBe(502);
     expect(whapi).not.toHaveBeenCalled();
   });
 
@@ -109,14 +107,17 @@ describe("POST /api/tasks/:id/whatsapp", () => {
     const { task, cleaner } = await seed({ phone: "+971 58 590 1656" });
 
     const first = await send(task.id);
-    expect(await first.json()).toEqual({ kind: "ASSIGNED" });
+    const firstBody = await first.json();
+    expect(firstBody.kind).toBe("ASSIGNED");
+    expect(firstBody.recipients).toEqual(["Anna"]);
     expect(whapi).toHaveBeenCalledTimes(1);
     const sent = JSON.parse(whapi.mock.calls[0][1].body);
     expect(sent.to).toBe("971585901656@s.whatsapp.net");
     expect(sent.body).toContain("*Anna* assigned to:");
 
-    const saved = await prisma.task.findUnique({ where: { id: task.id } });
-    expect(saved?.whatsappSentToUserId).toBe(cleaner.id);
+    const saved = await prisma.taskAssignedCleaner.findFirst({
+      where: { taskId: task.id, userId: cleaner.id },
+    });
     expect(saved?.whatsappSentCheckoutTime).toBe("11:00");
 
     const second = await send(task.id);
@@ -125,7 +126,7 @@ describe("POST /api/tasks/:id/whatsapp", () => {
   });
 
   it("sends TIMING CHANGED when the time is edited after sending", async () => {
-    const { task } = await seed({ phone: "+971 58 590 1656" });
+    const { task, cleaner } = await seed({ phone: "+971 58 590 1656" });
     await send(task.id);
     whapi.mockClear();
 
@@ -135,12 +136,17 @@ describe("POST /api/tasks/:id/whatsapp", () => {
     });
     const res = await send(task.id);
 
-    expect(await res.json()).toEqual({ kind: "TIMING_CHANGED" });
+    expect(await res.json()).toEqual({
+      kind: "TIMING_CHANGED",
+      recipients: ["Anna"],
+    });
     const sent = JSON.parse(whapi.mock.calls[0][1].body);
     expect(sent.body).toContain("TIMING CHANGED");
     expect(sent.body).toContain("Checkout: ~11:00~ → *12:30*");
 
-    const saved = await prisma.task.findUnique({ where: { id: task.id } });
+    const saved = await prisma.taskAssignedCleaner.findFirst({
+      where: { taskId: task.id, userId: cleaner.id },
+    });
     expect(saved?.whatsappSentCheckoutTime).toBe("12:30");
   });
 
@@ -151,18 +157,23 @@ describe("POST /api/tasks/:id/whatsapp", () => {
 
     const res = await send(task.id, "?resend=true");
 
-    expect(await res.json()).toEqual({ kind: "ASSIGNED" });
+    expect(await res.json()).toEqual({
+      kind: "ASSIGNED",
+      recipients: ["Anna"],
+    });
     expect(whapi).toHaveBeenCalledTimes(1);
   });
 
   it("does not record the message as sent when WhatsApp fails", async () => {
-    const { task } = await seed({ phone: "+971 58 590 1656" });
+    const { task, cleaner } = await seed({ phone: "+971 58 590 1656" });
     whapi.mockResolvedValue(new Response("boom", { status: 500 }));
 
     const res = await send(task.id);
 
     expect(res.status).toBe(502);
-    const saved = await prisma.task.findUnique({ where: { id: task.id } });
+    const saved = await prisma.taskAssignedCleaner.findFirst({
+      where: { taskId: task.id, userId: cleaner.id },
+    });
     expect(saved?.whatsappSentAt).toBeNull();
   });
 });

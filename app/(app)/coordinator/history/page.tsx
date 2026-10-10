@@ -334,11 +334,13 @@ function buildSummary(
 ): string | null {
   switch (action) {
     case "TASK_CREATED":
-      return newVal?.assignedToUserId
+      return newVal?.assignedToUserIds?.length > 0
         ? `Created and assigned task`
         : `Created task`;
     case "TASK_ASSIGNED":
-      return newVal?.assignedToUserId ? `Assigned to user` : `Unassigned task`;
+      return newVal?.assignedToUserIds?.length > 0
+        ? `Assigned to ${newVal.assignedToUserIds.length} user(s)`
+        : `Unassigned task`;
     case "TASK_STARTED":
       return `Started cleaning`;
     case "TASK_COMPLETED":

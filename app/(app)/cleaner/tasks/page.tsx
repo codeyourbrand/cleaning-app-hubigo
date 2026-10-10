@@ -25,7 +25,7 @@ type TaskWithApartment = {
   requests: string | null;
   instructions: string | null;
   apartment: { id: string; number: string; building: string | null };
-  assignedTo: { id: string; name: string } | null;
+  assignedTo: { id: string; name: string }[];
 };
 
 function getTaskTypeLabel(type: string, customTypeName?: string | null) {
@@ -235,6 +235,9 @@ function TaskCard({ task }: { task: TaskWithApartment }) {
         <div className="space-y-1 text-sm text-muted-foreground mb-3">
           {task.checkoutTime && <p>Checkout {task.checkoutTime}</p>}
           {task.checkinWindow && <p>Check-in {task.checkinWindow}</p>}
+          {task.assignedTo.length > 0 && (
+            <p>Assigned: {task.assignedTo.map((a) => a.name).join(", ")}</p>
+          )}
           {(task.guestsCount || task.nightsCount) && (
             <p>
               {task.guestsCount ? `${task.guestsCount} guests` : ""}

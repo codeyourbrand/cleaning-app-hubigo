@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { DEFAULT_TASK_STEPS } from "@/lib/task-steps";
+import { CleanerMultiSelect } from "@/components/cleaner-multi-select";
 
 type Apartment = { id: string; number: string; building: string | null };
 type User = { id: string; name: string };
@@ -58,7 +59,7 @@ export default function NewTaskPage() {
     nightsCount: "",
     requests: "",
     instructions: "",
-    assignedToUserId: "",
+    assignedToUserIds: [] as string[],
     steps: DEFAULT_TASK_STEPS.join("\n"),
   });
 
@@ -91,8 +92,8 @@ export default function NewTaskPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.assignedToUserId) {
-      toast.error("Please assign a cleaner");
+    if (form.assignedToUserIds.length === 0) {
+      toast.error("Please assign at least one cleaner");
       return;
     }
     if (!form.type) {
@@ -105,7 +106,7 @@ export default function NewTaskPage() {
       date: new Date(form.date),
       guestsCount: form.guestsCount ? parseInt(form.guestsCount) : undefined,
       nightsCount: form.nightsCount ? parseInt(form.nightsCount) : undefined,
-      assignedToUserId: form.assignedToUserId || null,
+      assignedToUserIds: form.assignedToUserIds,
       customTypeName: form.type === "OTHER" ? form.customTypeName : undefined,
       steps: form.steps
         .split("\n")
@@ -166,24 +167,14 @@ export default function NewTaskPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label htmlFor="assignedTo">
-                Assigned cleaner <span className="text-destructive">*</span>
+                Assigned cleaners <span className="text-destructive">*</span>
               </Label>
-              <select
-                id="assignedTo"
-                value={form.assignedToUserId}
-                onChange={(e) =>
-                  setForm({ ...form, assignedToUserId: e.target.value })
-                }
-                className={selectClass}
-                required
-              >
-                <option value="">Select cleaner</option>
-                {cleaners.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </select>
+              <CleanerMultiSelect
+                cleaners={cleaners}
+                selected={form.assignedToUserIds}
+                onChange={(ids) => setForm({ ...form, assignedToUserIds: ids })}
+                placeholder="Select cleaners"
+              />
             </div>
             <div>
               <Label htmlFor="checkoutTime">

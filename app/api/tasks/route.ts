@@ -28,19 +28,28 @@ export const GET = withRole(
     if (status) where.status = status;
     if (apartmentId) where.apartmentId = apartmentId;
     if (myTasks && user.role === Role.CLEANER) {
-      where.assignedToUserId = user.id;
+      where.assignedTo = { some: { userId: user.id } };
     }
 
-    const tasks = await prisma.task.findMany({
+    const rawTasks = await prisma.task.findMany({
       where,
       orderBy: [{ date: "asc" }, { createdAt: "asc" }],
       include: {
         apartment: true,
-        assignedTo: { select: { id: true, name: true, avatarUrl: true } },
+        assignedTo: {
+          include: {
+            user: { select: { id: true, name: true, avatarUrl: true } },
+          },
+        },
         steps: { orderBy: { order: "asc" } },
         _count: { select: { comments: true, media: true } },
       },
     });
+
+    const tasks = rawTasks.map((t) => ({
+      ...t,
+      assignedTo: t.assignedTo.map((a) => a.user),
+    }));
 
     return NextResponse.json({ tasks });
   },
@@ -68,7 +77,7 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
     nightsCount,
     requests,
     instructions,
-    assignedToUserId,
+    assignedToUserIds,
     steps,
   } = parsed.data;
 
@@ -90,8 +99,11 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
       nightsCount,
       requests,
       instructions,
-      assignedToUserId,
       createdByUserId: ctx.user.userId,
+      assignedTo:
+        assignedToUserIds.length > 0
+          ? { create: assignedToUserIds.map((userId) => ({ userId })) }
+          : undefined,
       steps: {
         create: steps.map((name, idx) => ({ name, order: idx })),
       },
@@ -103,15 +115,15 @@ export const POST = withRole([Role.COORDINATOR], async (req, ctx) => {
     userId: ctx.user.userId,
     taskId: task.id,
     action: "TASK_CREATED",
-    newValue: { id: task.id, apartmentId, type, date, assignedToUserId },
+    newValue: { id: task.id, apartmentId, type, date, assignedToUserIds },
   });
 
-  if (assignedToUserId) {
+  if (assignedToUserIds.length > 0) {
     await logAudit({
       userId: ctx.user.userId,
       taskId: task.id,
       action: "TASK_ASSIGNED",
-      newValue: { assignedToUserId },
+      newValue: { assignedToUserIds },
     });
   }
 

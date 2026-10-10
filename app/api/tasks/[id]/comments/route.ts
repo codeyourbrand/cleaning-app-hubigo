@@ -71,28 +71,37 @@ export const POST = withRole(
       newValue: { id: comment.id, parentId, body: commentBody },
     });
 
-    // A coordinator's comment goes to the assigned cleaner; a cleaner's comment
+    // A coordinator's comment goes to all assigned cleaners; a cleaner's comment
     // can only reach the group. Fire-and-forget, off unless enabled in settings.
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
         apartment: true,
-        assignedTo: { select: { id: true, name: true, phone: true } },
+        assignedTo: {
+          include: {
+            user: { select: { id: true, name: true, phone: true } },
+          },
+        },
       },
     });
     if (task) {
-      const recipient =
-        ctx.user.role === Role.COORDINATOR &&
-        task.assignedTo?.id !== ctx.user.userId
-          ? task.assignedTo
-          : null;
-      sendWhatsAppNotification(
-        "TASK_COMMENTED",
-        buildTaskCommentedMessage(task, ctx.user.name, commentBody),
-        recipient
-          ? { recipient, actorUserId: ctx.user.userId, taskId }
-          : undefined,
-      ).catch(() => {});
+      const assignees = task.assignedTo.map((a) => a.user);
+      if (ctx.user.role === Role.COORDINATOR) {
+        for (const recipient of assignees) {
+          if (recipient.id === ctx.user.userId) continue;
+          sendWhatsAppNotification(
+            "TASK_COMMENTED",
+            buildTaskCommentedMessage(task, ctx.user.name, commentBody),
+            { recipient, actorUserId: ctx.user.userId, taskId },
+          ).catch(() => {});
+        }
+      } else {
+        sendWhatsAppNotification(
+          "TASK_COMMENTED",
+          buildTaskCommentedMessage(task, ctx.user.name, commentBody),
+          { actorUserId: ctx.user.userId, taskId },
+        ).catch(() => {});
+      }
     }
 
     return NextResponse.json({ comment }, { status: 201 });

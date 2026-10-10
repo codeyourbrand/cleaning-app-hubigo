@@ -65,7 +65,7 @@ export const taskCreateSchema = z.object({
   nightsCount: z.coerce.number().int().min(0).optional(),
   requests: z.string().optional(),
   instructions: z.string().optional(),
-  assignedToUserId: z.string().cuid().optional().nullable(),
+  assignedToUserIds: z.array(z.string().cuid()).optional().default([]),
   steps: z.array(z.string()).optional().default([]),
 });
 
@@ -89,7 +89,7 @@ export const taskUpdateSchema = z.object({
   nightsCount: z.coerce.number().int().min(0).optional().nullable(),
   requests: z.string().optional().nullable(),
   instructions: z.string().optional().nullable(),
-  assignedToUserId: z.string().cuid().optional().nullable(),
+  assignedToUserIds: z.array(z.string().cuid()).optional().nullable(),
   status: z
     .enum([TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.DONE])
     .optional(),

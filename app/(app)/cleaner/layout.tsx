@@ -25,7 +25,9 @@ export default function CleanerLayout({
   return (
     <div className="flex flex-col min-h-screen pb-20">
       <header className="sticky top-0 z-40 flex items-center justify-between bg-sidebar text-sidebar-foreground px-4 py-3">
-        <HubigoLogo markClassName="size-8" />
+        <Link href="/cleaner/tasks" className="inline-block">
+          <HubigoLogo markClassName="size-8" />
+        </Link>
         <button
           onClick={logout}
           className="inline-flex size-9 items-center justify-center rounded-lg text-sidebar-foreground/80 hover:bg-sidebar-accent transition-colors"

@@ -2,9 +2,11 @@
  * What the coordinator's WhatsApp button should do for a task.
  *
  * NO_ASSIGNEE     - nobody to message yet
- * PENDING         - assignee has not been notified (or a different person was notified)
- * TIMING_CHANGED  - assignee was notified, but the time was edited afterwards
- * SENT            - assignee has the current assignment and time
+ * PENDING         - at least one assignee has not been notified (or a different
+ *                   person was notified)
+ * TIMING_CHANGED  - every assignee was notified, but the time was edited
+ *                   afterwards for at least one of them
+ * SENT            - all current assignees have the current assignment and time
  */
 export type TaskNotifyState =
   | "NO_ASSIGNEE"
@@ -12,22 +14,29 @@ export type TaskNotifyState =
   | "TIMING_CHANGED"
   | "SENT";
 
+type AssigneeWithSendState = {
+  id: string;
+  whatsappSentAt?: Date | string | null;
+  whatsappSentCheckoutTime?: string | null;
+};
+
 export type TaskNotifyInput = {
-  assignedToUserId?: string | null;
-  assignedTo?: { id: string } | null;
+  assignedTo?: AssigneeWithSendState[] | null;
   checkoutTime: string | null;
-  whatsappSentAt: Date | string | null;
-  whatsappSentToUserId: string | null;
-  whatsappSentCheckoutTime: string | null;
 };
 
 export function getTaskNotifyState(task: TaskNotifyInput): TaskNotifyState {
-  const assigneeId = task.assignedTo?.id ?? task.assignedToUserId ?? null;
-  if (!assigneeId) return "NO_ASSIGNEE";
-  if (!task.whatsappSentAt || task.whatsappSentToUserId !== assigneeId) {
-    return "PENDING";
-  }
-  const sentTime = task.whatsappSentCheckoutTime ?? null;
-  const currentTime = task.checkoutTime ?? null;
-  return sentTime === currentTime ? "SENT" : "TIMING_CHANGED";
+  const assignees = task.assignedTo ?? [];
+  if (assignees.length === 0) return "NO_ASSIGNEE";
+
+  const anyPending = assignees.some(
+    (a) =>
+      !a.whatsappSentAt || a.whatsappSentCheckoutTime !== task.checkoutTime,
+  );
+  if (!anyPending) return "SENT";
+
+  const anyTimingChanged = assignees.some(
+    (a) => a.whatsappSentAt && a.whatsappSentCheckoutTime !== task.checkoutTime,
+  );
+  return anyTimingChanged ? "TIMING_CHANGED" : "PENDING";
 }

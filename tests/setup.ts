@@ -8,6 +8,7 @@ beforeAll(async () => {
     "media",
     "comments",
     "task_steps",
+    "task_assigned_cleaners",
     "tasks",
     "lost_found",
     "damages",

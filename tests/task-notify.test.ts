@@ -2,33 +2,54 @@ import { describe, expect, it } from "vitest";
 import { getTaskNotifyState } from "@/lib/task-notify";
 
 const base = {
-  assignedTo: { id: "u1" },
-  checkoutTime: "11:00",
-  whatsappSentAt: null,
-  whatsappSentToUserId: null,
-  whatsappSentCheckoutTime: null,
+  assignedTo: [
+    { id: "u1", whatsappSentAt: null, whatsappSentCheckoutTime: null },
+  ],
+  checkoutTime: "11:00" as string | null,
 };
 
 describe("getTaskNotifyState", () => {
   it("has no one to notify without an assignee", () => {
-    expect(getTaskNotifyState({ ...base, assignedTo: null })).toBe(
-      "NO_ASSIGNEE",
-    );
+    expect(getTaskNotifyState({ ...base, assignedTo: [] })).toBe("NO_ASSIGNEE");
   });
 
-  it("is pending until the assignee has been messaged", () => {
+  it("is pending until every assignee has been messaged", () => {
     expect(getTaskNotifyState(base)).toBe("PENDING");
   });
 
-  it("is sent when the assignee and time match what was sent", () => {
+  it("is sent when all assignees have matching sent state", () => {
     expect(
       getTaskNotifyState({
         ...base,
-        whatsappSentAt: new Date(),
-        whatsappSentToUserId: "u1",
-        whatsappSentCheckoutTime: "11:00",
+        assignedTo: [
+          {
+            id: "u1",
+            whatsappSentAt: new Date(),
+            whatsappSentCheckoutTime: "11:00",
+          },
+        ],
       }),
     ).toBe("SENT");
+  });
+
+  it("is pending when only some assignees have been messaged", () => {
+    expect(
+      getTaskNotifyState({
+        ...base,
+        assignedTo: [
+          {
+            id: "u1",
+            whatsappSentAt: new Date(),
+            whatsappSentCheckoutTime: "11:00",
+          },
+          {
+            id: "u2",
+            whatsappSentAt: null,
+            whatsappSentCheckoutTime: null,
+          },
+        ],
+      }),
+    ).toBe("PENDING");
   });
 
   it("flags timing changed when the time is edited after sending", () => {
@@ -36,23 +57,15 @@ describe("getTaskNotifyState", () => {
       getTaskNotifyState({
         ...base,
         checkoutTime: "12:30",
-        whatsappSentAt: new Date(),
-        whatsappSentToUserId: "u1",
-        whatsappSentCheckoutTime: "11:00",
+        assignedTo: [
+          {
+            id: "u1",
+            whatsappSentAt: new Date(),
+            whatsappSentCheckoutTime: "11:00",
+          },
+        ],
       }),
     ).toBe("TIMING_CHANGED");
-  });
-
-  it("is pending again when a different cleaner is assigned", () => {
-    expect(
-      getTaskNotifyState({
-        ...base,
-        assignedTo: { id: "u2" },
-        whatsappSentAt: new Date(),
-        whatsappSentToUserId: "u1",
-        whatsappSentCheckoutTime: "11:00",
-      }),
-    ).toBe("PENDING");
   });
 
   it("treats a missing time as unchanged when it was sent without one", () => {
@@ -60,16 +73,14 @@ describe("getTaskNotifyState", () => {
       getTaskNotifyState({
         ...base,
         checkoutTime: null,
-        whatsappSentAt: "2026-10-09T10:00:00.000Z",
-        whatsappSentToUserId: "u1",
-        whatsappSentCheckoutTime: null,
+        assignedTo: [
+          {
+            id: "u1",
+            whatsappSentAt: "2026-10-09T10:00:00.000Z",
+            whatsappSentCheckoutTime: null,
+          },
+        ],
       }),
     ).toBe("SENT");
-  });
-
-  it("accepts a plain assignedToUserId instead of the relation", () => {
-    expect(
-      getTaskNotifyState({ ...base, assignedTo: null, assignedToUserId: "u1" }),
-    ).toBe("PENDING");
   });
 });

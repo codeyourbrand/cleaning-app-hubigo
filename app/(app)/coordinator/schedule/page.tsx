@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { getTaskNotifyState } from "@/lib/task-notify";
+import { CleanerMultiSelect } from "@/components/cleaner-multi-select";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +38,12 @@ type TaskRow = {
   requests: string | null;
   instructions: string | null;
   apartment: { id: string; number: string; building: string | null };
-  assignedTo: { id: string; name: string } | null;
+  assignedTo: {
+    id: string;
+    name: string;
+    whatsappSentAt: string | null;
+    whatsappSentCheckoutTime: string | null;
+  }[];
   whatsappSentAt: string | null;
   whatsappSentToUserId: string | null;
   whatsappSentCheckoutTime: string | null;
@@ -202,7 +208,14 @@ function WhatsAppButton({
   sending: boolean;
   onSend: (resend: boolean) => void;
 }) {
-  const state = getTaskNotifyState(task);
+  const state = getTaskNotifyState({
+    assignedTo: task.assignedTo.map((a) => ({
+      id: a.id,
+      whatsappSentAt: a.whatsappSentAt,
+      whatsappSentCheckoutTime: a.whatsappSentCheckoutTime,
+    })),
+    checkoutTime: task.checkoutTime,
+  });
   const { className, title, Icon } = WHATSAPP_BUTTON[state];
   return (
     <button
@@ -299,7 +312,7 @@ function DailyView({
     apartmentId: "",
     type: "CHECK_OUT",
     time: "",
-    assignedToUserId: "",
+    assignedToUserIds: [] as string[],
   });
   const [creatingTask, setCreatingTask] = useState(false);
   const [sendingWhatsApp, setSendingWhatsApp] = useState<string | null>(null);
@@ -351,9 +364,22 @@ function DailyView({
       prev
         ? {
             ...prev,
-            tasks: prev.tasks.map((t) =>
-              t.id === id ? ({ ...t, ...patch } as TaskRow) : t,
-            ),
+            tasks: prev.tasks.map((t) => {
+              if (t.id !== id) return t;
+              const next = { ...t, ...patch } as TaskRow;
+              if ("assignedToUserIds" in patch) {
+                const ids = (patch.assignedToUserIds as string[]) ?? [];
+                next.assignedTo = prev.cleaners
+                  .filter((c) => ids.includes(c.id))
+                  .map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    whatsappSentAt: null,
+                    whatsappSentCheckoutTime: null,
+                  }));
+              }
+              return next;
+            }),
           }
         : prev,
     );
@@ -363,7 +389,7 @@ function DailyView({
       body: JSON.stringify(patch),
     });
     if (!res.ok) toast.error("Failed to save");
-    if ("assignedToUserId" in patch || "apartmentId" in patch || !res.ok)
+    if ("assignedToUserIds" in patch || "apartmentId" in patch || !res.ok)
       load(true);
   }
 
@@ -379,7 +405,9 @@ function DailyView({
       toast.success(
         body.kind === "TIMING_CHANGED"
           ? "TIMING CHANGED sent"
-          : `Sent to ${task.assignedTo?.name}`,
+          : body.recipients?.length
+            ? `Sent to ${body.recipients.join(", ")}`
+            : "Sent",
       );
       load(true);
     } finally {
@@ -406,11 +434,16 @@ function DailyView({
           date: dateStr,
           type: newTask.type,
           checkoutTime: newTask.time || undefined,
-          assignedToUserId: newTask.assignedToUserId || null,
+          assignedToUserIds: newTask.assignedToUserIds,
         }),
       });
       if (!res.ok) throw new Error();
-      setNewTask({ ...newTask, apartmentId: "", time: "" });
+      setNewTask({
+        ...newTask,
+        apartmentId: "",
+        time: "",
+        assignedToUserIds: [],
+      });
       load(true);
     } catch {
       toast.error("Failed to create task");
@@ -752,22 +785,15 @@ function DailyView({
                   />
                 </td>
                 <td className="border border-black px-1 py-1">
-                  <select
-                    className={cellClass}
-                    value={t.assignedTo?.id ?? ""}
-                    onChange={(e) =>
-                      patchTask(t.id, {
-                        assignedToUserId: e.target.value || null,
-                      })
+                  <CleanerMultiSelect
+                    cleaners={data.cleaners}
+                    selected={t.assignedTo.map((c) => c.id)}
+                    onChange={(ids) =>
+                      patchTask(t.id, { assignedToUserIds: ids })
                     }
-                  >
-                    <option value="">Unassigned</option>
-                    {data.cleaners.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Unassigned"
+                    className="min-w-[140px]"
+                  />
                 </td>
                 <td className="border border-black px-1 py-1">
                   <select
@@ -904,20 +930,15 @@ function DailyView({
                 />
               </td>
               <td className="border border-black px-1 py-2">
-                <select
-                  className={cellClass}
-                  value={newTask.assignedToUserId}
-                  onChange={(e) =>
-                    setNewTask({ ...newTask, assignedToUserId: e.target.value })
+                <CleanerMultiSelect
+                  cleaners={data.cleaners}
+                  selected={newTask.assignedToUserIds}
+                  onChange={(ids) =>
+                    setNewTask({ ...newTask, assignedToUserIds: ids })
                   }
-                >
-                  <option value="">Unassigned</option>
-                  {data.cleaners.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Unassigned"
+                  className="min-w-[140px]"
+                />
               </td>
               <td className="border border-black px-1 py-2">
                 <select

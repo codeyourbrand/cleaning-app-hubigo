@@ -14,8 +14,11 @@ export const GET = withRole(
 
     const baseWhere: any = {};
     if (cleaner && cleaner !== "") {
-      if (cleaner === "me") baseWhere.assignedToUserId = ctx.user.userId;
-      else baseWhere.assignedToUserId = cleaner;
+      if (cleaner === "me") {
+        baseWhere.assignedTo = { some: { userId: ctx.user.userId } };
+      } else {
+        baseWhere.assignedTo = { some: { userId: cleaner } };
+      }
     }
     if (building) {
       baseWhere.apartment = { building };
@@ -31,7 +34,7 @@ export const GET = withRole(
 
     // One query for the whole range (each query is a database round trip),
     // split into days afterwards. The order is preserved within each day.
-    const [tasks, cleaners] = await Promise.all([
+    const [rawTasks, cleaners] = await Promise.all([
       prisma.task.findMany({
         where: {
           ...baseWhere,
@@ -43,7 +46,11 @@ export const GET = withRole(
         ],
         include: {
           apartment: { select: { id: true, number: true, building: true } },
-          assignedTo: { select: { id: true, name: true } },
+          assignedTo: {
+            include: {
+              user: { select: { id: true, name: true } },
+            },
+          },
         },
       }),
       prisma.user.findMany({
@@ -52,6 +59,11 @@ export const GET = withRole(
         orderBy: { name: "asc" },
       }),
     ]);
+
+    const tasks = rawTasks.map((t) => ({
+      ...t,
+      assignedTo: t.assignedTo.map((a) => a.user),
+    }));
 
     const [today, tomorrow, dayAfter] = days.map((day) =>
       tasks.filter((t) => t.date >= day.start && t.date <= day.end),

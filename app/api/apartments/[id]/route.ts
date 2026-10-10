@@ -18,7 +18,11 @@ export const GET = withRole(
           orderBy: { date: "desc" },
           take: 100,
           include: {
-            assignedTo: { select: { id: true, name: true, avatarUrl: true } },
+            assignedTo: {
+              include: {
+                user: { select: { id: true, name: true, avatarUrl: true } },
+              },
+            },
             media: true,
           },
         },

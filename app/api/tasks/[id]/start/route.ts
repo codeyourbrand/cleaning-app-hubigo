@@ -14,17 +14,22 @@ export const POST = withRole(
     const id = ctx.params?.id as string;
     const task = await prisma.task.findUnique({
       where: { id },
-      include: { assignedTo: { select: { id: true } } },
+      include: {
+        assignedTo: {
+          select: { userId: true },
+        },
+      },
     });
     if (!task) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
     // Cleaners can only start their own assigned tasks unless explicitly permitted
+    const assignedUserIds = task.assignedTo.map((a) => a.userId);
     if (
       ctx.user.role === Role.CLEANER &&
-      task.assignedToUserId &&
-      task.assignedToUserId !== ctx.user.userId
+      assignedUserIds.length > 0 &&
+      !assignedUserIds.includes(ctx.user.userId)
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -49,7 +54,11 @@ export const POST = withRole(
       },
       include: {
         apartment: true,
-        assignedTo: { select: { id: true, name: true, avatarUrl: true } },
+        assignedTo: {
+          include: {
+            user: { select: { id: true, name: true, avatarUrl: true } },
+          },
+        },
       },
     });
 
@@ -68,10 +77,15 @@ export const POST = withRole(
     });
     sendWhatsAppNotification(
       "TASK_STARTED",
-      buildTaskStartedMessage({ ...updated, startedBy: startedUser }),
+      buildTaskStartedMessage({
+        ...updated,
+        startedBy: startedUser,
+      }),
       { actorUserId: ctx.user.userId, taskId: id, recipient: startedUser },
     ).catch(() => {});
 
-    return NextResponse.json({ task: updated });
+    return NextResponse.json({
+      task: { ...updated, assignedTo: updated.assignedTo.map((a) => a.user) },
+    });
   },
 );
